@@ -1,26 +1,27 @@
 use super::{
     state::State,
-    bitFunctions,
+    bit_functions,
     consts
 };
 
 fn round(state: &mut State, block: &[u8], round: usize) {
     let function = match round {
-        0 => bitFunctions::f,
-        1 => bitFunctions::g,
-        2 => bitFunctions::h,
-        3 => bitFunctions::i,
+        0 => bit_functions::f,
+        1 => bit_functions::g,
+        2 => bit_functions::h,
+        3 => bit_functions::i,
         _ => unreachable!(),
     };
 
     let (mut k, inc) = consts::X_INDEX_START[round];
     let mut i: usize;
     let mut s: usize;
+
     for iter in 0..16 {
         i = 16 * round + iter;
         s = consts::S[round][iter % 4];
 
-        *state.get_a() = state.b() + ((state.a() + function(state.b(), state.c(), state.d() + block[k] as u32 + consts::T[i])) << s);
+        *state.get_a() = (state.a().wrapping_add(function(state.b(), state.c(), state.d()).wrapping_add(block[k] as u32).wrapping_add(consts::T[i]))).rotate_left(s as u32).wrapping_add(state.b());
 
         state.next_state();
         k += inc;
@@ -31,15 +32,19 @@ fn round(state: &mut State, block: &[u8], round: usize) {
 
 pub fn md5(input: &str) -> u128 {
     let mut input = input.as_bytes().to_vec();
-    let len = input.len() as u64;
-    let mut padding_len = 512 - (len as usize % 512) - 64;
+
+    let bits = input.len() as u64 * 8;
+    let mut padding_len = ((448 - ((bits % 512) as isize) + 512) % 512) as usize;
+
+    assert_eq!(padding_len % 8, 0);
     if padding_len == 0 { padding_len = 512 }
-    let mut padding = vec![0_u8; padding_len];
-    padding[0] = 0b1000_0000;
-    padding.extend_from_slice(&(len & 0xffff).to_le_bytes());
-    padding.extend_from_slice(&(len & (0xffff << 32)).to_le_bytes());
+    let mut padding = vec![0_u8; padding_len / 8];
+    padding[0] = 0x80;
+    padding.extend_from_slice(&((bits & u32::MAX as u64) as u32).to_be_bytes());
+    padding.extend_from_slice(&(((bits & ((u32::MAX as u64) << 32)) >> 32) as u32).to_be_bytes());
 
     input.append(&mut padding);
+    assert_eq!(input.len() * 8 % 512, 0);
 
     let n = input.len();
     let mut state = State::new();
@@ -48,13 +53,13 @@ pub fn md5(input: &str) -> u128 {
         let block = &input[i * 16..(i + 1) * 16];
         let mut temp_state = state.clone();
 
-        round(&mut temp_state, block, 0);
-        round(&mut temp_state, block, 1);
-        round(&mut temp_state, block, 2);
-        round(&mut temp_state, block, 3);
+        (0..4).for_each(|r| round(&mut temp_state, block, r));
 
         state += temp_state;
     }
+
+    println!("Final state: a={:08x}, b={:08x}, c={:08x}, d={:08x}", state.a, state.b, state.c, state.d);
+    println!("Hash: {:032x}", state.get_hash());
 
     state.get_hash()
 }

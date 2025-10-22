@@ -71,16 +71,16 @@ impl State {
     }
 
     pub fn get_hash(&self) -> u128 {
-        (( self.a.to_le() as u128 ) << 48) | (( self.b.to_le() as u128 ) << 32) | (( self.c.to_le() as u128 ) << 16) | (self.d.to_le() as u128)
+        (( self.a.to_le() as u128 ) << 96) | (( self.b.to_le() as u128 ) << 64) | (( self.c.to_le() as u128 ) << 32) | (self.d.to_le() as u128)
     }
 }
 
 impl std::ops::AddAssign<State> for State {
     fn add_assign(&mut self, rhs: State) {
-        self.a += rhs.a;
-        self.b += rhs.b;
-        self.c += rhs.c;
-        self.d += rhs.d;
+        self.a = self.a.wrapping_add(rhs.a);
+        self.b = self.b.wrapping_add(rhs.b);
+        self.c = self.c.wrapping_add(rhs.c);
+        self.d = self.d.wrapping_add(rhs.d);
     }
 }
 
