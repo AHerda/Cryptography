@@ -1,2 +1,4 @@
-pub mod consts;
-pub mod state;
+mod bitFunctions;
+mod consts;
+pub mod md5;
+mod state;
