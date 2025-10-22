@@ -1,7 +1,4 @@
-const STARTING_A: u32 = 0x67452301;
-const STARTING_B: u32 = 0xEFCDAB89;
-const STARTING_C: u32 = 0x98BADCFE;
-const STARTING_D: u32 = 0x10325476;
+use crate::lib::consts;
 
 struct State {
     a: u32,
@@ -13,10 +10,10 @@ struct State {
 impl State {
     pub fn new() -> Self {
         State {
-            a: STARTING_A,
-            b: STARTING_B,
-            c: STARTING_C,
-            d: STARTING_D,
+            a: consts::STARTING_A,
+            b: consts::STARTING_B,
+            c: consts::STARTING_C,
+            d: consts::STARTING_D,
         }
     }
 }
