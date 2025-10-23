@@ -71,7 +71,10 @@ impl State {
     }
 
     pub fn get_hash(&self) -> u128 {
-        (( self.a.to_le() as u128 ) << 96) | (( self.b.to_le() as u128 ) << 64) | (( self.c.to_le() as u128 ) << 32) | (self.d.to_le() as u128)
+        (self.a.swap_bytes() as u128) << 96
+            | (self.b.swap_bytes() as u128) << 64
+            | (self.c.swap_bytes() as u128) << 32
+            | (self.d.swap_bytes() as u128)
     }
 }
 
@@ -158,5 +161,26 @@ mod tests {
         assert_eq!(state.b(), consts::STARTING_B);
         assert_eq!(state.c(), consts::STARTING_C);
         assert_eq!(state.d(), consts::STARTING_D);
+    }
+
+    #[test]
+    fn test_get_hash() {
+        let state = State {
+            a: 0x01234567,
+            b: 0x89abcdef,
+            c: 0xfedcba98,
+            d: 0x76543210,
+            state: 0,
+        };
+        assert_eq!(
+            format!("{:x}", state.get_hash()),
+            format!(
+                "{:x}{:x}{:x}{:x}",
+                state.a.swap_bytes(),
+                state.b.swap_bytes(),
+                state.c.swap_bytes(),
+                state.d.swap_bytes()
+            )
+        );
     }
 }

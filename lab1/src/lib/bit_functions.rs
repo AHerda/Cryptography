@@ -14,7 +14,6 @@ pub fn i(x: u32, y: u32, z: u32) -> u32 {
     y ^ (x | !z)
 }
 
-
 #[cfg(test)]
 mod tests {
     use super::*;
