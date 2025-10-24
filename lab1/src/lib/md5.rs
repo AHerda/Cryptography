@@ -1,4 +1,4 @@
-use super::{bit_functions, consts, state::State};
+use super::{bit_functions::*, consts, state::State};
 
 fn padding(input: &str) -> Vec<u8> {
     let bits = input.len() as u64 * 8;
@@ -8,13 +8,11 @@ fn padding(input: &str) -> Vec<u8> {
     }
     assert_eq!(0, (bits + padding_len * 8 + 64) % 512);
 
-    let mut result = input.as_bytes().to_vec();
-    result.push(0x80);
-    for _ in 0..padding_len - 1 {
-        result.push(0);
-    }
-    result.extend(bits.to_le_bytes());
-    result
+    input.bytes()
+        .chain(std::iter::once(0x80_u8))
+        .chain(std::iter::repeat_n(0x00_u8, padding_len as usize - 1))
+        .chain(bits.to_le_bytes().into_iter())
+        .collect::<Vec<u8>>()
 }
 
 pub struct Md5(u128);
@@ -23,52 +21,69 @@ impl Md5 {
     pub fn new(input: &str) -> Self {
         let input = padding(input);
         let mut state = State::new();
-        let u32_vec: Vec<u32> = input
+        let binding = input
             .chunks(4)
             .map(|chunk_4| u32::from_le_bytes(chunk_4.try_into().unwrap()))
+            .collect::<Vec<_>>();
+        let blocks: Vec<&[u32]> = binding
+            .chunks(16)
             .collect();
-        let blocks: Vec<&[u32]> = u32_vec.chunks(16).collect();
 
-        for block in blocks {
+        blocks.iter().for_each(|block| {
             let mut temp_state = state;
 
-            (0..4).for_each(|r| Self::round(&mut temp_state, &block, r));
+            Self::rounds(&mut temp_state, &block);
 
             state += temp_state;
-        }
+        });
 
         Self(state.get_hash())
     }
 
-    fn round(state: &mut State, block: &[u32], round: usize) {
-        let function = match round {
-            0 => bit_functions::f,
-            1 => bit_functions::g,
-            2 => bit_functions::h,
-            3 => bit_functions::i,
-            _ => unreachable!(),
-        };
+    fn rounds(state: &mut State, block: &[u32]) {
+        let mut iter: usize = 0;
+        macro_rules! round {
+            ($round: expr, $function: ident) => {
+                let (mut k, inc) = consts::X_INDEX_START[$round];
 
-        let (mut k, inc) = consts::X_INDEX_START[round];
-        let mut i: usize;
-        let mut s: usize;
-
-        for iter in 0..16 {
-            i = 16 * round + iter;
-            s = consts::S[round][iter % 4];
-
-            *state.get_a() = (state
-                .a()
-                .wrapping_add(function(state.b(), state.c(), state.d()))
-                .wrapping_add(block[k])
-                .wrapping_add(consts::T[i]))
-            .rotate_left(s as u32)
-            .wrapping_add(state.b());
-
-            state.next_state();
-            k += inc;
-            k %= 16;
+                sixteen!($function, a, b, c, d, k, inc, consts::S[$round][0], iter);
+                sixteen!($function, d, a, b, c, k, inc, consts::S[$round][1], iter);
+                sixteen!($function, c, d, a, b, k, inc, consts::S[$round][2], iter);
+                sixteen!($function, b, c, d, a, k, inc, consts::S[$round][3], iter);
+                sixteen!($function, a, b, c, d, k, inc, consts::S[$round][0], iter);
+                sixteen!($function, d, a, b, c, k, inc, consts::S[$round][1], iter);
+                sixteen!($function, c, d, a, b, k, inc, consts::S[$round][2], iter);
+                sixteen!($function, b, c, d, a, k, inc, consts::S[$round][3], iter);
+                sixteen!($function, a, b, c, d, k, inc, consts::S[$round][0], iter);
+                sixteen!($function, d, a, b, c, k, inc, consts::S[$round][1], iter);
+                sixteen!($function, c, d, a, b, k, inc, consts::S[$round][2], iter);
+                sixteen!($function, b, c, d, a, k, inc, consts::S[$round][3], iter);
+                sixteen!($function, a, b, c, d, k, inc, consts::S[$round][0], iter);
+                sixteen!($function, d, a, b, c, k, inc, consts::S[$round][1], iter);
+                sixteen!($function, c, d, a, b, k, inc, consts::S[$round][2], iter);
+                sixteen!($function, b, c, d, a, k, inc, consts::S[$round][3], iter);
+            };
         }
+
+        macro_rules! sixteen {
+            ($func: ident, $a: ident, $b: ident, $c: ident, $d: ident, $k: expr, $inc: expr, $s: expr, $i: expr) => {
+                state.$a = (state.$a
+                    .wrapping_add($func(state.$b, state.$c, state.$d))
+                    .wrapping_add(block[$k])
+                    .wrapping_add(consts::T[$i]))
+                    .rotate_left($s as u32)
+                    .wrapping_add(state.$b);
+                $i += 1;
+                $k = ($k + $inc) % 16;
+
+            };
+        }
+
+        round!(0, f);
+        round!(1, g);
+        round!(2, h);
+        round!(3, i);
+
     }
 
     pub fn to_str(&self) -> String {
@@ -92,12 +107,12 @@ mod tests {
     fn test_padding() {
         let mut vec = vec![0; 64];
         vec[0] = 0x80;
-        assert_eq!(padding(&""), vec);
+        assert_eq!(padding(""), vec);
 
         vec[0] = 'a' as u8;
         vec[1] = 0x80;
         vec[64 - 8] = 0x8;
-        assert_eq!(padding(&"a"), vec);
+        assert_eq!(padding("a"), vec);
     }
 
     #[test]
