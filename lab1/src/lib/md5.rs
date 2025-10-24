@@ -10,7 +10,9 @@ fn padding(input: &str) -> Vec<u8> {
 
     let mut result = input.as_bytes().to_vec();
     result.push(0x80);
-    result.append(&mut vec![0; padding_len as usize - 1]);
+    for _ in 0..padding_len - 1 {
+        result.push(0);
+    }
     result.extend(bits.to_le_bytes());
     result
 }
@@ -21,15 +23,11 @@ impl Md5 {
     pub fn new(input: &str) -> Self {
         let input = padding(input);
         let mut state = State::new();
-        let blocks: Vec<Vec<u32>> = input
-            .chunks(64)
-            .map(|chunk_64| {
-                chunk_64
-                    .chunks(4)
-                    .map(|chunk_4| u32::from_le_bytes(chunk_4.try_into().unwrap()))
-                    .collect()
-            })
+        let u32_vec: Vec<u32> = input
+            .chunks(4)
+            .map(|chunk_4| u32::from_le_bytes(chunk_4.try_into().unwrap()))
             .collect();
+        let blocks: Vec<&[u32]> = u32_vec.chunks(16).collect();
 
         for block in blocks {
             let mut temp_state = state;
@@ -42,7 +40,7 @@ impl Md5 {
         Self(state.get_hash())
     }
 
-        fn round(state: &mut State, block: &[u32], round: usize) {
+    fn round(state: &mut State, block: &[u32], round: usize) {
         let function = match round {
             0 => bit_functions::f,
             1 => bit_functions::g,
@@ -74,7 +72,7 @@ impl Md5 {
     }
 
     pub fn to_str(&self) -> String {
-        format!("{:x}", self.0)
+        format!("{:032x}", self.0)
     }
 }
 
