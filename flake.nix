@@ -26,6 +26,7 @@
           rust-analyzer
           rustfmt
           clippy
+          cargo-flamegraph
         ];
       };
     };

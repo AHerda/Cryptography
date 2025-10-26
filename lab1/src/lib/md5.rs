@@ -1,43 +1,40 @@
 use super::{bit_functions::*, consts, state::State};
 
-fn padding(input: &str) -> Vec<u8> {
-    let bits = input.len() as u64 * 8;
-    let mut padding_len = (512 - ((bits + 64) % 512)) / 8;
-    if padding_len == 0 {
-        padding_len = 512 / 8;
-    }
-    assert_eq!(0, (bits + padding_len * 8 + 64) % 512);
-
-    input.bytes()
-        .chain(std::iter::once(0x80_u8))
-        .chain(std::iter::repeat_n(0x00_u8, padding_len as usize - 1))
-        .chain(bits.to_le_bytes().into_iter())
-        .collect::<Vec<u8>>()
-}
-
-pub struct Md5(u128);
+pub struct Md5(State);
 
 impl Md5 {
     pub fn new(input: &str) -> Self {
-        let input = padding(input);
         let mut state = State::new();
-        let binding = input
+        
+        Self::padding(input)
             .chunks(4)
             .map(|chunk_4| u32::from_le_bytes(chunk_4.try_into().unwrap()))
-            .collect::<Vec<_>>();
-        let blocks: Vec<&[u32]> = binding
+            .collect::<Vec<_>>()
             .chunks(16)
-            .collect();
+            .for_each(|block| {
+                let mut temp_state = state;
 
-        blocks.iter().for_each(|block| {
-            let mut temp_state = state;
+                Self::rounds(&mut temp_state, &block);
 
-            Self::rounds(&mut temp_state, &block);
+                state += temp_state;
+            });
 
-            state += temp_state;
-        });
+        Self(state)
+    }
 
-        Self(state.get_hash())
+    pub(super) fn padding(input: &str) -> Vec<u8> {
+        let bits = input.len() as u64 * 8;
+        let mut padding_len = (512 - ((bits + 64) % 512)) / 8;
+        if padding_len == 0 {
+            padding_len = 64;
+        }
+        assert_eq!(0, (bits + padding_len * 8 + 64) % 512);
+
+        input.bytes()
+            .chain(std::iter::once(0x80_u8))
+            .chain(std::iter::repeat_n(0x00_u8, padding_len as usize - 1))
+            .chain(bits.to_le_bytes().into_iter())
+            .collect::<Vec<u8>>()
     }
 
     fn rounds(state: &mut State, block: &[u32]) {
@@ -87,15 +84,23 @@ impl Md5 {
     }
 
     pub fn to_str(&self) -> String {
-        format!("{:032x}", self.0)
+        format!("{:032x}", self.0.get_hash())
+    }
+
+    pub fn get_hash(&self) -> u128 {
+        self.0.get_hash()
     }
 }
 
-impl std::ops::Deref for Md5 {
-    type Target = u128;
+impl Into<u128> for Md5 {
+    fn into(self) -> u128 {
+        self.get_hash()
+    }
+}
 
-    fn deref(&self) -> &Self::Target {
-        &self.0
+impl Into<String> for Md5 {
+    fn into(self) -> String {
+        self.to_str()
     }
 }
 
@@ -107,35 +112,35 @@ mod tests {
     fn test_padding() {
         let mut vec = vec![0; 64];
         vec[0] = 0x80;
-        assert_eq!(padding(""), vec);
+        assert_eq!(Md5::padding(""), vec);
 
         vec[0] = 'a' as u8;
         vec[1] = 0x80;
         vec[64 - 8] = 0x8;
-        assert_eq!(padding("a"), vec);
+        assert_eq!(Md5::padding("a"), vec);
     }
 
     #[test]
     fn test_md5() {
-        assert_eq!(*Md5::new(""), 0xd41d8cd98f00b204e9800998ecf8427e);
-        assert_eq!(*Md5::new("a"), 0x0cc175b9c0f1b6a831c399e269772661);
-        assert_eq!(*Md5::new("abc"), 0x900150983cd24fb0d6963f7d28e17f72);
+        assert_eq!(Md5::new("").get_hash(), 0xd41d8cd98f00b204e9800998ecf8427e);
+        assert_eq!(Md5::new("a").get_hash(), 0x0cc175b9c0f1b6a831c399e269772661);
+        assert_eq!(Md5::new("abc").get_hash(), 0x900150983cd24fb0d6963f7d28e17f72);
         assert_eq!(
-            *Md5::new("message digest"),
+            Md5::new("message digest").get_hash(),
             0xf96b697d7cb7938d525a2f31aaf161d0
         );
         assert_eq!(
-            *Md5::new("abcdefghijklmnopqrstuvwxyz"),
+            Md5::new("abcdefghijklmnopqrstuvwxyz").get_hash(),
             0xc3fcd3d76192e4007dfb496cca67e13b
         );
         assert_eq!(
-            *Md5::new("ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789"),
+            Md5::new("ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789").get_hash(),
             0xd174ab98d277d9f5a5611c2c9f419d9f
         );
         assert_eq!(
-            *Md5::new(
+            Md5::new(
                 "12345678901234567890123456789012345678901234567890123456789012345678901234567890"
-            ),
+            ).get_hash(),
             0x57edf4a22be3c955ac49da2e2107b67a
         );
     }
