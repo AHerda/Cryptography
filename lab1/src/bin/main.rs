@@ -2,8 +2,8 @@ use rand::{self, distr::Alphanumeric, Rng};
 use md5;
 use std::io::Write;
 
-mod lib;
-use lib::md5::Md5;
+extern crate lab1;
+use lab1::md5::Md5;
 
 fn main() {
     let _ = benchmark_md5();

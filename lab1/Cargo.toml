@@ -3,6 +3,10 @@ name = "lab1"
 version = "0.1.0"
 edition = "2024"
 
+[lib]
+name = "lab1"
+path = "src/lib.rs"
+
 [dependencies]
 md5 = "0.8.0"
 rand = "0.9.2"

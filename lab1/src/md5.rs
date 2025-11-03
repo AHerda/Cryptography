@@ -3,9 +3,7 @@ use super::{bit_functions::*, consts, state::State};
 pub struct Md5(State);
 
 impl Md5 {
-    pub fn new(input: &str) -> Self {
-        let mut state = State::new();
-        
+    pub fn new_with_state(input: impl AsRef<[u8]>, mut state: State) -> Self {
         Self::padding(input)
             .chunks(4)
             .map(|chunk_4| u32::from_le_bytes(chunk_4.try_into().unwrap()))
@@ -22,15 +20,37 @@ impl Md5 {
         Self(state)
     }
 
-    pub(super) fn padding(input: &str) -> Vec<u8> {
-        let bits = input.len() as u64 * 8;
+    pub fn new_with_state_raw_block(input: Vec<u32>, mut state: State) -> Self {
+        let mut temp_state = state;
+        Self::rounds(&mut temp_state, &input);
+        state += temp_state;
+
+        Self(state)
+    }
+
+    pub fn new(input: impl AsRef<[u8]>) -> Self {
+        let state = State::new();
+        
+        Self::new_with_state(input, state)
+    }
+
+    pub fn new_raw_block(input: Vec<u32>) -> Self {
+        let state = State::new();
+        
+        Self::new_with_state_raw_block(input, state)
+    }
+
+    pub(super) fn padding(input: impl AsRef<[u8]>) -> Vec<u8> {
+        let bits = input.as_ref().len() as u64 * 8;
         let mut padding_len = (512 - ((bits + 64) % 512)) / 8;
         if padding_len == 0 {
             padding_len = 64;
         }
         assert_eq!(0, (bits + padding_len * 8 + 64) % 512);
 
-        input.bytes()
+        input.as_ref()
+            .iter()
+            .cloned()
             .chain(std::iter::once(0x80_u8))
             .chain(std::iter::repeat_n(0x00_u8, padding_len as usize - 1))
             .chain(bits.to_le_bytes().into_iter())
@@ -87,8 +107,20 @@ impl Md5 {
         format!("{:032x}", self.0.get_hash())
     }
 
+    pub fn to_str_be(&self) -> String {
+        format!("{:032x}", self.0.get_hash_be())
+    }
+    
     pub fn get_hash(&self) -> u128 {
         self.0.get_hash()
+    }
+
+    pub fn get_hash_be(&self) -> u128 {
+        self.0.get_hash_be()
+    }
+
+    pub fn get_state(&self) -> State {
+        self.0
     }
 }
 
