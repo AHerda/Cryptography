@@ -20,7 +20,7 @@ impl Md5 {
         Self(state)
     }
 
-    pub fn new_with_state_raw_block(input: Vec<u32>, mut state: State) -> Self {
+    pub fn new_with_state_raw_block(input: &[u32], mut state: State) -> Self {
         let mut temp_state = state;
         Self::rounds(&mut temp_state, &input);
         state += temp_state;
@@ -30,13 +30,13 @@ impl Md5 {
 
     pub fn new(input: impl AsRef<[u8]>) -> Self {
         let state = State::new();
-        
+
         Self::new_with_state(input, state)
     }
 
-    pub fn new_raw_block(input: Vec<u32>) -> Self {
+    pub fn new_raw_block(input: &[u32]) -> Self {
         let state = State::new();
-        
+
         Self::new_with_state_raw_block(input, state)
     }
 
@@ -48,7 +48,8 @@ impl Md5 {
         }
         assert_eq!(0, (bits + padding_len * 8 + 64) % 512);
 
-        input.as_ref()
+        input
+            .as_ref()
             .iter()
             .cloned()
             .chain(std::iter::once(0x80_u8))
@@ -84,15 +85,15 @@ impl Md5 {
 
         macro_rules! sixteen {
             ($func: ident, $a: ident, $b: ident, $c: ident, $d: ident, $k: expr, $inc: expr, $s: expr, $i: expr) => {
-                state.$a = (state.$a
+                state.$a = (state
+                    .$a
                     .wrapping_add($func(state.$b, state.$c, state.$d))
                     .wrapping_add(block[$k])
                     .wrapping_add(consts::T[$i]))
-                    .rotate_left($s as u32)
-                    .wrapping_add(state.$b);
+                .rotate_left($s as u32)
+                .wrapping_add(state.$b);
                 $i += 1;
                 $k = ($k + $inc) % 16;
-
             };
         }
 
@@ -100,7 +101,6 @@ impl Md5 {
         round!(1, g);
         round!(2, h);
         round!(3, i);
-
     }
 
     pub fn to_str(&self) -> String {
@@ -110,7 +110,7 @@ impl Md5 {
     pub fn to_str_be(&self) -> String {
         format!("{:032x}", self.0.get_hash_be())
     }
-    
+
     pub fn get_hash(&self) -> u128 {
         self.0.get_hash()
     }
@@ -156,7 +156,10 @@ mod tests {
     fn test_md5() {
         assert_eq!(Md5::new("").get_hash(), 0xd41d8cd98f00b204e9800998ecf8427e);
         assert_eq!(Md5::new("a").get_hash(), 0x0cc175b9c0f1b6a831c399e269772661);
-        assert_eq!(Md5::new("abc").get_hash(), 0x900150983cd24fb0d6963f7d28e17f72);
+        assert_eq!(
+            Md5::new("abc").get_hash(),
+            0x900150983cd24fb0d6963f7d28e17f72
+        );
         assert_eq!(
             Md5::new("message digest").get_hash(),
             0xf96b697d7cb7938d525a2f31aaf161d0
@@ -172,7 +175,8 @@ mod tests {
         assert_eq!(
             Md5::new(
                 "12345678901234567890123456789012345678901234567890123456789012345678901234567890"
-            ).get_hash(),
+            )
+            .get_hash(),
             0x57edf4a22be3c955ac49da2e2107b67a
         );
     }

@@ -26,10 +26,7 @@ impl State {
     }
 
     pub fn get_hash_be(&self) -> u128 {
-        (self.a as u128) << 96
-            | (self.b as u128) << 64
-            | (self.c as u128) << 32
-            | (self.d as u128)
+        (self.a as u128) << 96 | (self.b as u128) << 64 | (self.c as u128) << 32 | (self.d as u128)
     }
 }
 

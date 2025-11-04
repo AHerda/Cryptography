@@ -1,18 +1,22 @@
-use rand::{self, distr::Alphanumeric, Rng};
 use md5;
+use rand::{self, Rng, distr::Alphanumeric};
 use std::io::Write;
 
 extern crate lab1;
 use lab1::md5::Md5;
 
 fn main() {
-    let _ = benchmark_md5();
+    // _look_for_collision();
+    let _ = _benchmark_md5();
     // let _hash = Md5::new("Adrian Herda");
-    // flamegraph();
+    // _flamegraph();
+}
+
+fn _look_for_collision() {
 
 }
 
-fn benchmark_md5() -> std::io::Result<()> {
+fn _benchmark_md5() -> std::io::Result<()> {
     let iters = 10000;
     let mut avg = 0_f64;
     let s_len = 1000;
@@ -52,17 +56,26 @@ fn benchmark_md5() -> std::io::Result<()> {
         }
 
         // println!("Average time for theirs md5 for n = {}: {:?}", n, avg / iters as f64);
-        writeln!(file, "{},{},{}", n, avg1 / iters as f64, avg2 / iters as f64)?;
+        writeln!(
+            file,
+            "{},{},{}",
+            n,
+            avg1 / iters as f64,
+            avg2 / iters as f64
+        )?;
         avg += avg1 / avg2;
     }
 
     file.flush()?;
-    println!("\rOverall average time ratio (mine/theirs): {:?}", avg / s_len as f64);
+    println!(
+        "\rOverall average time ratio (mine/theirs): {:?}",
+        avg / s_len as f64
+    );
 
     Ok(())
 }
 
-fn flamegraph() {
+fn _flamegraph() {
     let iters = 10000;
     let s_len = 1000;
 
