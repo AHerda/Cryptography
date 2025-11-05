@@ -1,5 +1,6 @@
 use lab1::consts::{
-    DIFF_M0, DIFF_M1_1, DIFF_M1_2, EXPECTED_HASH1, EXPECTED_HASH2, M0_1, M0_2, M0_PRIM_1, M0_PRIM_2, M1_1, M1_2, M1_PRIM_1, M1_PRIM_2
+    DIFF_M0, DIFF_M1, EXPECTED_HASH1, EXPECTED_HASH2, M0_1, M0_2, M0_PRIM_1, M0_PRIM_2, M1_1, M1_2,
+    M1_PRIM_1, M1_PRIM_2,
 };
 use lab1::md5::Md5;
 
@@ -8,12 +9,22 @@ fn test_collision_one_from_table2_v1() {
     let m0 = M0_1;
     let m0_prim = M0_PRIM_1;
     for i in 0..16 {
-        assert_eq!(m0[i] as i64 - m0_prim[i] as i64, DIFF_M0[i], "Error at index: {}", i);
+        assert_eq!(
+            (m0[i] as i64).wrapping_add(DIFF_M0[i]) % (1 << 32),
+            m0_prim[i] as i64,
+            "Error at index: {}",
+            i
+        );
     }
     let m1 = M1_1;
     let m1_prim = M1_PRIM_1;
     for i in 0..16 {
-        assert_eq!(m1[i] as i64 - m1_prim[i] as i64, DIFF_M1_1[i], "Error at index: {}", i);
+        assert_eq!(
+            (m1[i] as i64).wrapping_add(DIFF_M1[i]) % (1 << 32),
+            m1_prim[i] as i64,
+            "Error at index: {}",
+            i
+        );
     }
     let expected_hash = EXPECTED_HASH1;
     assert_ne!(m1, m1_prim);
@@ -34,12 +45,22 @@ fn test_collision_one_from_table2_v2() {
     let m0 = M0_2;
     let m0_prim = M0_PRIM_2;
     for i in 0..16 {
-        assert_eq!(m0[i] as i64 - m0_prim[i] as i64, DIFF_M0[i], "Error at index: {}", i);
+        assert_eq!(
+            (m0[i] as i64).wrapping_add(DIFF_M0[i]) % (1 << 32),
+            m0_prim[i] as i64,
+            "Error at index: {}",
+            i
+        );
     }
     let m1 = M1_2;
     let m1_prim = M1_PRIM_2;
     for i in 0..16 {
-        assert_eq!(m1[i] as i64 - m1_prim[i] as i64, DIFF_M1_2[i], "Error at index: {}", i);
+        assert_eq!(
+            (m1[i] as i64).wrapping_add(DIFF_M1[i]) % (1 << 32),
+            m1_prim[i] as i64,
+            "Error at index: {}",
+            i
+        );
     }
     let expected_hash = EXPECTED_HASH2;
     assert_ne!(m1, m1_prim);

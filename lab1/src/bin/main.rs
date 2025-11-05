@@ -3,9 +3,9 @@ use rand::{self, Rng, distr::Alphanumeric};
 use std::io::Write;
 
 extern crate lab1;
-use lab1::{collision_finder::CollisionFinder, conditions::Condition, consts, md5::Md5};
+use lab1::{collision_finder::CollisionFinder, consts, md5::Md5};
 
-fn main() -> std::io::Result<()> {
+fn main() {
     _look_for_collision()
     // let _ = _benchmark_md5();
     // let _hash = Md5::new("Adrian Herda");
@@ -13,16 +13,19 @@ fn main() -> std::io::Result<()> {
     // Ok(())
 }
 
-fn _look_for_collision() -> std::io::Result<()> {
-    let conditions = Condition::read_condtions_file()?;
-
-    let cf = CollisionFinder::new(consts::M0_1, consts::M0_PRIM_1, conditions);
-    let (msg1, msg2, h) = cf.find_collision();
+fn _look_for_collision() {
+    let cf = CollisionFinder::new(consts::M0_1, consts::M0_PRIM_1, consts::DIFF_M1);
+    let msg1 = cf.find_collision();
+    let msg2: Vec<u32> = msg1
+        .iter()
+        .zip(consts::DIFF_M1.iter())
+        .map(|(&x, &y)| ((x as i64 + y) % (1 << 32)) as u32)
+        .collect();
+    let h = Md5::new_with_state_raw_block(&msg1, Md5::new_raw_block(&consts::M0_1).get_state())
+        .get_hash();
 
     println!("Messages:\n\t{:?}\n\t{:?}", msg1, msg2);
-    println!("{:x}", h.get_hash());
-
-    Ok(())
+    println!("{:x}", h);
 }
 
 fn _benchmark_md5() -> std::io::Result<()> {
