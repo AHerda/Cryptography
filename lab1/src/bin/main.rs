@@ -3,17 +3,26 @@ use rand::{self, Rng, distr::Alphanumeric};
 use std::io::Write;
 
 extern crate lab1;
-use lab1::md5::Md5;
+use lab1::{collision_finder::CollisionFinder, conditions::Condition, consts, md5::Md5};
 
-fn main() {
-    // _look_for_collision();
-    let _ = _benchmark_md5();
+fn main() -> std::io::Result<()> {
+    _look_for_collision()
+    // let _ = _benchmark_md5();
     // let _hash = Md5::new("Adrian Herda");
     // _flamegraph();
+    // Ok(())
 }
 
-fn _look_for_collision() {
+fn _look_for_collision() -> std::io::Result<()> {
+    let conditions = Condition::read_condtions_file()?;
 
+    let cf = CollisionFinder::new(consts::M0_1, consts::M0_PRIM_1, conditions);
+    let (msg1, msg2, h) = cf.find_collision();
+
+    println!("Messages:\n\t{:?}\n\t{:?}", msg1, msg2);
+    println!("{:x}", h.get_hash());
+
+    Ok(())
 }
 
 fn _benchmark_md5() -> std::io::Result<()> {

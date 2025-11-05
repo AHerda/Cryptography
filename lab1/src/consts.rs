@@ -69,3 +69,38 @@ pub const EXPECTED_HASH2: &str = "8d5e701961804e08715d6b586324c015";
 pub const DIFF_M0: [i64; 16] = [0,0,0,0,1<<31,0,0,0,0,0,0,-(1<<15),0,0,1<<31,0];
 pub const DIFF_M1_1: [i64; 16] = [0,0,0,0,1<<31,0,0,0,0,0,0,1<<15,0,0,1<<31,0];
 pub const DIFF_M1_2: [i64; 16] = [0,0,0,0,1<<31,0,0,0,0,0,0,1<<15,0,0,-(1<<31),0];
+
+// /// Masks for message manipulation
+// pub const MASK_SET1_A1: u32 = 0x84200000;
+// pub const MASK_SET0_A1: u32 = 0x0A000820;
+
+// pub const MASK_SET1_D1: u32 = 0x8C000800;
+// pub const MASK_SET0_D1: u32 = 0x02208026;
+
+// pub const MASK_SET1_C1: u32 = 0xBE1F0966;
+// pub const MASK_SET0_C1: u32 = 0x40201080;
+
+// pub const MASK_SET1_B1: u32 = 0xBA040010;
+// pub const MASK_SET0_B1: u32 = 0x443B19EE;
+
+// pub const MASK_SET1_A2: u32 = 0x482F0E50;
+// pub const MASK_SET1_D2: u32 = 0x04220C56;
+// pub const MASK_SET1_C2: u32 = 0x96011E01;
+// pub const MASK_SET1_B2: u32 = 0x843283C0;
+// pub const MASK_SET1_A3: u32 = 0x9C0101C1;
+// pub const MASK_SET1_D3: u32 = 0x878383C0;
+// pub const MASK_SET1_C3: u32 = 0x800583C3;
+// pub const MASK_SET0_A2: u32 = 0xB41011AF;
+// pub const MASK_SET0_D2: u32 = 0x9A1113A9;
+// pub const MASK_SET0_C2: u32 = 0x083201C0;
+// pub const MASK_SET0_B2: u32 = 0x1B810001;
+// pub const MASK_SET0_A3: u32 = 0x03828202;
+// pub const MASK_SET0_D3: u32 = 0x00041003;
+// pub const MASK_SET0_C3: u32 = 0x00021000;
+// pub const MASK_COPY_D1: u32 = 0x701F10C0;
+// pub const MASK_COPY_C1: u32 = 0x00000018;
+// pub const MASK_COPY_B1: u32 = 0x00000601;
+// pub const MASK_COPY_C2: u32 = 0x01808000;
+// pub const MASK_COPY_B2: u32 = 0x00000002;
+// pub const MASK_COPY_A3: u32 = 0x00001000;
+// pub const MASK_COPY_C3: u32 = 0x00086000;
