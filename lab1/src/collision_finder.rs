@@ -1,6 +1,7 @@
 use std::sync::{Arc, Mutex};
 use std::thread;
 use std::time::Duration;
+use rayon::prelude::*;
 
 use rand;
 
@@ -102,7 +103,7 @@ impl CollisionFinder {
         let h = Md5::new_with_state_raw_block(&self.m1, iv_0);
         let hash = h.get_hash();
         let iv_0_prim = Md5::new_raw_block(&self.m0_prim).get_state();
-        let mut m1_prim;
+        let m1_prim_res = Arc::new(Mutex::new([0; 16]));
 
         let iter_counter: Arc<Mutex<u128>> = Arc::new(Mutex::new(0));
         let binding_count = iter_counter.clone();
@@ -120,17 +121,19 @@ impl CollisionFinder {
             }
         });
 
-        loop {
-            m1_prim = Self::random_message();
+        (0..(1_u64 << 50)).into_par_iter().for_each(|_| {
+            let mut m1_prim = Self::random_message();
             let mut h_prim = self.process_message(&mut m1_prim, iv_0_prim.clone());
             h_prim += iv_0_prim;
             if h_prim.get_hash() == hash {
                 if Md5::new_with_state_raw_block(&self.m1, iv_0).get_hash() == Md5::new_with_state_raw_block(&m1_prim, iv_0_prim).get_hash() {
                     println!(
-                        "{} -> Found!!!",
+                        "{} -> Found!!! {:?}",
                         chrono::Local::now().format("%Y-%m-%d %H:%M:%S"),
+                        m1_prim,
                     );
-                    break;
+                    *m1_prim_res.clone().lock().unwrap() = m1_prim;
+                    return;
                 } else {
                     println!(
                         "{} -> False positive",
@@ -139,8 +142,8 @@ impl CollisionFinder {
                 }
             }
             *iter_counter.clone().lock().unwrap() += 1;
-        }
+        });
         _ = thread.join();
-        (self.m1, m1_prim, h)
+        (self.m1, *m1_prim_res.lock().unwrap(), h)
     }
 }
