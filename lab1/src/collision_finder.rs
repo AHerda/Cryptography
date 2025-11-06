@@ -52,11 +52,12 @@ impl CollisionFinder {
         let t = &consts::T;
         let x = &consts::X_INDEX_START;
         let masks = &consts::MASKS;
+        let mut original_value: u32;
 
         macro_rules! sixteen {
             ($func: ident, $a: ident, $b: ident, $c: ident, $d: ident, $k: expr, $s: expr, $i: expr) => {
-                state.$a = (state
-                    .$a
+                original_value = state.$a;
+                state.$a = (state.$a
                     .wrapping_add($func(state.$b, state.$c, state.$d))
                     .wrapping_add(m1[$k])
                     .wrapping_add(t[$i]))
@@ -67,13 +68,13 @@ impl CollisionFinder {
 
         macro_rules! backtrack {
             ($func: ident, $a: ident, $b: ident, $c: ident, $d: ident, $k: expr, $s: expr, $i: expr) => {
-                Self::modify_bit(&mut state.a, state.b, &masks[$i]);
-                m1[$k] = state
-                    .$a
+                Self::modify_bit(&mut state.$a, state.$b, &masks[$i]);
+                m1[$k] = state.$a
                     .wrapping_sub(state.$b)
                     .rotate_right($s as u32)
-                    .wrapping_sub(state.$a)
-                    .wrapping_sub($func(state.$b, state.$c, state.$d));
+                    .wrapping_sub(original_value)
+                    .wrapping_sub($func(state.$b, state.$c, state.$d))
+                    .wrapping_sub(t[$i]);
             };
         }
 
@@ -138,13 +139,13 @@ impl CollisionFinder {
         for (round, func) in [g, h, i].iter().enumerate() {
             let (mut k, inc) = x[round + 1];
             for _ in 0..4 {
-                sixteen!(func, a, b, c, d, k, s[round][0], iter);
+                sixteen!(func, a, b, c, d, k, s[round + 1][0], iter);
                 increment!(k, inc, iter);
-                sixteen!(func, d, a, b, c, k, s[round][1], iter);
+                sixteen!(func, d, a, b, c, k, s[round + 1][1], iter);
                 increment!(k, inc, iter);
-                sixteen!(func, c, d, a, b, k, s[round][2], iter);
+                sixteen!(func, c, d, a, b, k, s[round + 1][2], iter);
                 increment!(k, inc, iter);
-                sixteen!(func, b, c, d, a, k, s[round][3], iter);
+                sixteen!(func, b, c, d, a, k, s[round + 1][3], iter);
                 increment!(k, inc, iter);
             }
         }
@@ -176,6 +177,7 @@ impl CollisionFinder {
         let result = Arc::new(Mutex::new([0u32; 16]));
         let counter = Arc::new(AtomicU64::new(0));
 
+
         Self::log_data(counter.clone(), found.clone());
 
         (0..(1_u64 << 50)).into_par_iter().for_each(|_| {
@@ -187,7 +189,7 @@ impl CollisionFinder {
                 .iter()
                 .zip(self.delta_m1.iter())
                 .map(|(&x, &y)| {
-                    ((x as i64 + y) % (1 << 32)) as u32
+                    ((x as i64 + y + (1 << 32)) % (1 << 32)) as u32
                 })
                 .collect();
             let h_prim = Md5::new_with_state_raw_block(&m1_prim, iv_0_prim);
@@ -199,15 +201,16 @@ impl CollisionFinder {
                     println!(
                         "{} -> Gloria! Gloria! Hallelujah!!!\n\tFound!!! {:?}",
                         chrono::Local::now().format("%Y-%m-%d %H:%M:%S"),
-                        m1_prim,
+                        m1,
                     );
                     *result.lock().unwrap() = m1;
                     found.store(true, Ordering::Relaxed);
                     return;
                 } else {
                     println!(
-                        "{} -> False positive",
+                        "{} -> False positive {:?}",
                         chrono::Local::now().format("%Y-%m-%d %H:%M:%S"),
+                        m1,
                     );
                 }
             }
