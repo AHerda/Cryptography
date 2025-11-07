@@ -18,6 +18,10 @@ impl State {
         }
     }
 
+    pub fn new_with_values(a: u32, b: u32, c: u32, d: u32) -> Self {
+        Self { a, b, c, d }
+    }
+
     pub fn get_hash(&self) -> u128 {
         (self.a.swap_bytes() as u128) << 96
             | (self.b.swap_bytes() as u128) << 64
