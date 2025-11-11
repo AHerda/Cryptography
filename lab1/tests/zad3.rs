@@ -1,8 +1,6 @@
-use lab1::consts::{
-    self, DIFF_M0, DIFF_M1
-};
-use lab1::my_collision;
+use lab1::consts::{self, DIFF_M0, DIFF_M1};
 use lab1::md5::Md5;
+use lab1::my_collision;
 
 #[test]
 fn test_collision_one_from_table2_v1() {

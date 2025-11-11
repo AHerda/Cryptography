@@ -17,19 +17,17 @@ use crate::{
 pub struct CollisionFinder {
     m0: [u32; 16],
     m0_prim: [u32; 16],
-    delta_m1: [i64; 16],
 }
 
 impl CollisionFinder {
-    pub fn new(m0: [u32; 16], m0_prim: [u32; 16], delta_m1: [i64; 16]) -> Self {
+    pub fn new(m0: [u32; 16], m0_prim: [u32; 16]) -> Self {
         Self {
             m0,
             m0_prim,
-            delta_m1,
         }
     }
 
-    fn random_message() -> [u32; 16] {
+    fn _random_message() -> [u32; 16] {
         let mut rng = rand::rng();
         let mut m1 = [0_u32; 16];
         for cell in &mut m1 {
@@ -97,15 +95,13 @@ impl CollisionFinder {
         }
 
         'main: loop {
-            // let State { a: aa, b: bb, c: cc, d: dd } = *state;
-
             let mut q = [0_u32; 65];
             q[0] = state.b;
 
             // 1. choose Q_2, ..., Q_16 fullfining conditions
             q[2] = Self::modify_bit(rng.random(), 0x0000_0000, &masks[1]);
             q[2] = (q[2] & !0x8000_0000) | (!state.b & 0x8000_0000);
-            for i in 3..=16 { // Q_1 just to fullfil conditions on q2
+            for i in 3..=16 {
                 q[i] = Self::modify_bit(rng.random(), q[i - 1], &masks[i - 1]);
             }
 
@@ -126,7 +122,6 @@ impl CollisionFinder {
 
             // 3. Loop until Q_17, ..., Q_21 are fullfilling conditions
             for iter in 0..(1 << 12) {
-                // println!("In Part 3");
                 // 3.a) Choose Q_1 fullfiling conditions
                 q[1] = Self::modify_bit(rng.random(), q[0], &masks[0]);
                 q[1] = (q[1] & !masks[1].copy) | (q[2] & masks[1].copy);
@@ -189,7 +184,6 @@ impl CollisionFinder {
                     q10_free_count -= 1;
                 }
             }
-            // println!("{}", q10_free_count + q10_free_count);
 
             // 4. Loop over all possible Q_9, Q_10 satisfying conditions such that m_11 does not change
             let q9_base = q[9];
@@ -244,7 +238,6 @@ impl CollisionFinder {
                     k += 5 * inc;
                     k %= 16;
 
-                    // println!("{}", k);
                     sixteen!(g, q[i + 1], q[i], q[i - 1], q[i - 2], k, s[1][i % 4], i, q[i - 3]); // Q_22
                     if !Self::check_q(q[i + 1], q[i], &masks[i]) {
                         continue;
@@ -278,7 +271,7 @@ impl CollisionFinder {
                     sixteen!(g, q[i + 1], q[i], q[i - 1], q[i - 2], k, s[1][i % 4], i, q[i - 3]); // Q_31
                     increment!(k, inc, i);
                     sixteen!(g, q[i + 1], q[i], q[i - 1], q[i - 2], k, s[1][i % 4], i, q[i - 3]); // Q_32
-                    increment!(k, inc, i);
+                    i += 1;
 
                     // round 3
                     let (mut k, inc) = x[2];
@@ -316,7 +309,7 @@ impl CollisionFinder {
                     increment!(k, inc, i);
                     sixteen!(h, q[i + 1], q[i], q[i - 1], q[i - 2], k, s[2][i % 4], i, q[i - 3]); // Q_48
                     if q[i + 1] & oldest_bit != q[i - 1] & oldest_bit { continue }
-                    increment!(k, inc, i);
+                    i += 1;
 
                     // round 4
                     let (mut k, inc) = x[3];
@@ -368,11 +361,10 @@ impl CollisionFinder {
                     increment!(k, inc, i);
                     sixteen!(ii, q[i + 1], q[i], q[i - 1], q[i - 2], k, s[3][i % 4], i, q[i - 3]); // Q_64
 
-                    // let m11 = m1.map(|word| word.swap_bytes());
-                    let mut m1p = m1.clone();
-                    m1p[4] = m1p[4].wrapping_add(1 << 31);
-                    m1p[11] = m1p[11].wrapping_sub(1 << 15);
-                    m1p[14] = m1p[14].wrapping_add(1 << 31);
+                    let m1p: Vec<u32> = m1
+                        .iter()
+                        .zip(consts::DIFF_M1)
+                        .map(|(&x, y)| ((x as i64 + y) % (1 << 32)) as u32).collect();
 
                     let h = Md5::new_with_state_raw_block(&m1, state.clone());
                     let hp = Md5::new_with_state_raw_block(&m1p, state2.clone());
@@ -383,9 +375,6 @@ impl CollisionFinder {
                         c.fetch_add(1, Ordering::Relaxed);
                         continue 'main;
                     }
-
-                    // Stop searching if all conditions are satisfied and a near-collision is verified
-                    // return Some(m1);
                 }
 
                 if mask9 == q9_max - 1 {
@@ -395,7 +384,7 @@ impl CollisionFinder {
         }
     }
 
-    fn log_data(counter: Arc<AtomicU64>, counter_near: Arc<AtomicU64>, found: Arc<AtomicBool>) {
+    fn _log_data(counter: Arc<AtomicU64>, counter_near: Arc<AtomicU64>, found: Arc<AtomicBool>) {
         thread::spawn(move || {
             while !found.load(Ordering::Relaxed) {
                 thread::sleep(Duration::from_secs(5));
@@ -413,55 +402,23 @@ impl CollisionFinder {
         });
     }
 
-    pub fn find_collision(&self) -> [u32; 16] {
+    pub fn find_collision(&self) -> Vec<[u32; 16]> {
         let iv_0 = Md5::new_raw_block(&self.m0).get_state();
         let iv_0_prim = Md5::new_raw_block(&self.m0_prim).get_state();
 
-        let found = Arc::new(AtomicBool::new(false));
-        let result = Arc::new(Mutex::new([0u32; 16]));
-        let counter = Arc::new(AtomicU64::new(0));
+        let result: Arc<Mutex<Vec<[u32; 16]>>> = Arc::new(Mutex::new(vec![]));
         let counter_near: Arc<AtomicU64> = Arc::new(AtomicU64::new(0));
 
         thread::scope(|s| {
-            s.spawn(|| Self::log_data(counter.clone(), counter_near.clone(), found.clone()));
-            for _ in 0..11 {s.spawn(|| {
-                counter.fetch_add(1, Ordering::Relaxed);
+            for _ in 0..12 {s.spawn(|| {
                 if let Some(m1) = Self::process_message(&iv_0, &iv_0_prim, counter_near.clone()) {
-                    *result.lock().unwrap() = m1;
+                    result.lock().unwrap().push(m1);
                 }
-                // let h = Md5::new_with_state_raw_block(&m1, iv_0);
-
-                // let m1_prim: Vec<u32> = m1
-                //     .iter()
-                //     .zip(self.delta_m1.iter())
-                //     .map(|(&x, &y)| ((x as i64 + y + (1 << 32)) % (1 << 32)) as u32)
-                //     .collect();
-                // let h_prim = Md5::new_with_state_raw_block(&m1_prim, iv_0_prim);
-
-                // if h.get_hash() == h_prim.get_hash() {
-                //     if Md5::new_with_state_raw_block(&m1, iv_0).get_hash()
-                //         == Md5::new_with_state_raw_block(&m1_prim, iv_0_prim).get_hash()
-                //     {
-                //         println!(
-                //             "{} -> Gloria! Gloria! Hallelujah!!!\n\tFound!!! {:?}",
-                //             chrono::Local::now().format("%Y-%m-%d %H:%M:%S"),
-                //             m1,
-                //         );
-                //         *result.lock().unwrap() = m1;
-                //         found.store(true, Ordering::Relaxed);
-                //         break;
-                //     } else {
-                //         println!(
-                //             "{} -> False positive {:?}",
-                //             chrono::Local::now().format("%Y-%m-%d %H:%M:%S"),
-                //             m1,
-                //         );
-                //     }
-                // }
-                // counter_near.fetch_add(1, Ordering::Relaxed);
             });}
         });
-
-        *result.lock().unwrap()
+        let result = result.lock().unwrap().to_vec();
+        println!("Found collisions: {}", result.len());
+        println!("Found near collisions: {}", counter_near.load(Ordering::Relaxed));
+        result
     }
 }
