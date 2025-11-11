@@ -6,8 +6,8 @@ extern crate lab1;
 use lab1::{collision_finder::CollisionFinder, consts, md5::Md5};
 
 fn main() {
-    _look_for_collision()
-    // let _ = _benchmark_md5();
+    // _look_for_collision()
+    let _ = _benchmark_md5();
     // let _hash = Md5::new("Adrian Herda");
     // _flamegraph();
     // Ok(())
@@ -24,7 +24,7 @@ fn _look_for_collision() {
     let h = Md5::new_with_state_raw_block(&msg1, Md5::new_raw_block(&consts::M0_1).get_state())
         .get_hash();
 
-    println!("Messages:\n\t{:?}\n\t{:?}", msg1, msg2);
+    println!("Messages:\n\t{:x?}\n\t{:x?}", msg1, msg2);
     println!("{:x}", h);
 }
 

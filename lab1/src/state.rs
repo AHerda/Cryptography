@@ -43,6 +43,12 @@ impl std::ops::AddAssign<State> for State {
     }
 }
 
+impl PartialEq for State {
+    fn eq(&self, other: &Self) -> bool {
+        self.a == other.a && self.b == other.b && self.c == other.c && self.d == other.d
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

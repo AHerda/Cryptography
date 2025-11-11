@@ -136,6 +136,12 @@ impl Into<String> for Md5 {
     }
 }
 
+impl PartialEq for Md5 {
+    fn eq(&self, other: &Self) -> bool {
+        self.0 == other.0
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

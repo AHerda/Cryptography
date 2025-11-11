@@ -110,6 +110,13 @@ pub struct Mask {
     pub copy_not: u32,
 }
 
+impl Mask {
+    #[inline]
+    pub(super) fn fixed_bits(&self) -> u32 {
+        self.zero | self.one | self.copy | self.copy_not
+    }
+}
+
 /// Masks
 pub const MASKS: [Mask; 24] = [
     Mask {
@@ -257,7 +264,3 @@ pub const MASKS: [Mask; 24] = [
         copy_not: 0b00000000000000000000000000000000,
     },
 ];
-
-pub const I_IDNEXES: [usize; 4] = [46, 48, 60, 62];
-pub const J_IDNEXES: [usize; 9] = [47, 49, 51, 53, 55, 57, 59, 61, 63];
-pub const K_IDNEXES: [usize; 5] = [50, 52, 54, 56, 58];

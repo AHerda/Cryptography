@@ -1,4 +1,3 @@
-use rayon::prelude::*;
 use std::sync::{
     Arc, Mutex,
     atomic::{AtomicBool, AtomicU64, Ordering},
@@ -6,9 +5,9 @@ use std::sync::{
 use std::thread;
 use std::time::Duration;
 
-use rand::{self, Rng, rng};
+use rand::{self, Rng};
 
-use crate::bit_functions::*;
+use crate::bit_functions::{self, *};
 use crate::{
     consts::{self, Mask},
     md5::Md5,
@@ -39,37 +38,43 @@ impl CollisionFinder {
         m1
     }
 
-    fn modify_bit(value_to_modify: &mut u32, value_to_copy: u32, mask: &Mask) {
-        *value_to_modify |= mask.one;
-        *value_to_modify &= !mask.zero;
-        *value_to_modify = (*value_to_modify & !mask.copy) | (value_to_copy & mask.copy);
-        *value_to_modify = (*value_to_modify & !mask.copy_not) | (!value_to_copy & mask.copy_not);
+    #[inline]
+    fn modify_bit(value_to_modify: u32, value_to_copy: u32, mask: &Mask) -> u32 {
+        (value_to_modify & !mask.zero & !mask.copy & !mask.copy_not)
+            | mask.one
+            | (mask.copy & value_to_copy)
+            | (mask.copy_not & !value_to_copy)
     }
 
+    #[inline]
     fn q_17_to_1_21(q: &[u32; 65], masks: &[Mask]) -> bool {
-        (17..=21).all(|i| {
-            let Mask {zero, one, copy, copy_not} = masks[i - 1];
-            q[i] & zero == 0
-                && q[i] & one == one
-                && q[i] & copy == q[i - 1] & copy
-                && q[i] & copy_not == !q[i - 1] & copy_not
-        })
+        (17..=21).all(|i| Self::check_q(q[i], q[i - 1], &masks[i - 1]))
     }
 
-    fn process_message(m1: &mut [u32; 16], state: &State) -> Option<State> {
+    #[inline]
+    fn check_q(q: u32, q_prev: u32, mask: &Mask) -> bool {
+        q & mask.zero == 0
+            && q & mask.one == mask.one
+            && q & mask.copy == q_prev & mask.copy
+            && q & mask.copy_not == !q_prev & mask.copy_not
+    }
+
+    fn process_message(state: &State, state2: &State, c: Arc<AtomicU64>) -> Option<[u32; 16]> {
         let s = &consts::S;
         let t = &consts::T;
         let x = &consts::X_INDEX_START;
         let masks = &consts::MASKS;
+        let mut rng = rand::rng();
+        let mut m1 = [0; 16];
 
         macro_rules! sixteen {
-            ($func: ident, $a: expr, $b: ident, $c: ident, $d: ident, $k: expr, $s: expr, $i: expr, $orig: ident) => {
+            ($func: ident, $a: expr, $b: expr, $c: expr, $d: expr, $k: expr, $s: expr, $i: expr, $orig: expr) => {
                 $a = ($orig
                     .wrapping_add($func($b, $c, $d))
                     .wrapping_add(m1[$k])
                     .wrapping_add(t[$i]))
                 .rotate_left($s as u32)
-                .wrapping_add($b);
+                .wrapping_add($b)
             };
         }
 
@@ -91,189 +96,309 @@ impl CollisionFinder {
             };
         }
 
-        let mut rng = rand::rng();
-        let mut q = [0_u32; 65];
-        q[0] = state.b;
+        'main: loop {
+            // let State { a: aa, b: bb, c: cc, d: dd } = *state;
 
-        // 1. choose Q_2, ..., Q_16 fullfining conditions
-        for i in 2..=16 {
-            q[i] = rng.random();
-            let value_to_copy = q[i - 1];
-            Self::modify_bit(&mut q[i], value_to_copy, &masks[i - 1]);
-        }
+            let mut q = [0_u32; 65];
+            q[0] = state.b;
 
-        // 2. Calculate m_5, .. m_15
-        for i in 5..=15 {
-            inverse!(f, q[i + 1], q[i], q[i - 1], q[i - 2], i, s[0][i % 4], i, q[i - 3])
-        }
-
-        let mut counter = 0;
-        // 3. Loop until Q_17, ..., Q_21 are fullfilling conditions
-        while !Self::q_17_to_1_21(&q, masks) {
-            counter += 1;
-            // println!("In Part 3");
-            // 3.a) Choose Q_1 fullfiling conditions
-            q[1] = rng.random();
-            let value_to_copy = q[0];
-            Self::modify_bit(&mut q[1], value_to_copy, &masks[0]);
-
-            // 3.b) Calculate m_0, ... m_4
-            inverse!(f, q[1], state.b, state.c, state.d, 0, s[0][0], 0, state.a); // m_0
-            inverse!(f, q[2], q[1], state.b, state.c, 1, s[0][1], 1, state.d); // m_1
-            inverse!(f, q[3], q[2], q[1], state.b, 2, s[0][2], 2, state.c); // m_2
-            inverse!(f, q[4], q[3], q[2], q[1], 3, s[0][3], 3, state.b); // m_3
-            inverse!(f, q[5], q[4], q[3], q[2], 4, s[0][0], 4, q[1]); // m_4
-
-            // 3.c) Calculate Q_17, ..., Q_21
-            let (mut k, inc) = x[1];
-            let mut _dummy = 0;
-            for i in 17..=21 {
-                let (b, c, d, a_old) = (q[i - 1], q[i - 2], q[i - 3], q[i - 4]);
-                sixteen!(g, q[i], b, c, d, k, s[1][(i - 1) % 4], i - 1, a_old);
-                increment!(k, inc, _dummy);
+            // 1. choose Q_2, ..., Q_16 fullfining conditions
+            q[2] = Self::modify_bit(rng.random(), 0x0000_0000, &masks[1]);
+            q[2] = (q[2] & !0x8000_0000) | (!state.b & 0x8000_0000);
+            for i in 3..=16 { // Q_1 just to fullfil conditions on q2
+                q[i] = Self::modify_bit(rng.random(), q[i - 1], &masks[i - 1]);
             }
-            if counter == 1 << 12 {
-                return None;
+
+            // 2. Calculate m_5, .. m_15
+            for i in 5..=15 {
+                inverse!(
+                    f,
+                    q[i + 1],
+                    q[i],
+                    q[i - 1],
+                    q[i - 2],
+                    i,
+                    s[0][i % 4],
+                    i,
+                    q[i - 3]
+                )
+            }
+
+            // 3. Loop until Q_17, ..., Q_21 are fullfilling conditions
+            for iter in 0..(1 << 12) {
+                // println!("In Part 3");
+                // 3.a) Choose Q_1 fullfiling conditions
+                q[1] = Self::modify_bit(rng.random(), q[0], &masks[0]);
+                q[1] = (q[1] & !masks[1].copy) | (q[2] & masks[1].copy);
+                if !Self::check_q(q[1], q[0], &masks[0]) {
+                    continue;
+                }
+
+                // 3.b) Calculate m_0, ... m_4
+                inverse!(f, q[1], state.b, state.c, state.d, 0, s[0][0], 0, state.a); // m_0
+                inverse!(f, q[2], q[1], state.b, state.c, 1, s[0][1], 1, state.d); // m_1
+                inverse!(f, q[3], q[2], q[1], state.b, 2, s[0][2], 2, state.c); // m_2
+                inverse!(f, q[4], q[3], q[2], q[1], 3, s[0][3], 3, state.b); // m_3
+                inverse!(f, q[5], q[4], q[3], q[2], 4, s[0][0], 4, q[1]); // m_4
+
+                // 3.c) Calculate Q_17, ..., Q_21
+                let mut i = 16;
+                let (mut k, inc) = x[1];
+                sixteen!(g, q[i + 1], q[i], q[i - 1], q[i - 2], k, s[1][i % 4], i, q[i - 3]);
+                increment!(k, inc, i);
+                sixteen!(g, q[i + 1], q[i], q[i - 1], q[i - 2], k, s[1][i % 4], i, q[i - 3]);
+                increment!(k, inc, i);
+                sixteen!(g, q[i + 1], q[i], q[i - 1], q[i - 2], k, s[1][i % 4], i, q[i - 3]);
+                increment!(k, inc, i);
+                sixteen!(g, q[i + 1], q[i], q[i - 1], q[i - 2], k, s[1][i % 4], i, q[i - 3]);
+                increment!(k, inc, i);
+                sixteen!(g, q[i + 1], q[i], q[i - 1], q[i - 2], k, s[1][i % 4], i, q[i - 3]);
+
+                if Self::q_17_to_1_21(&q, masks) {
+                    break;
+                }
+
+                if iter == (1 << 12) - 1 {
+                    continue 'main;
+                }
+            }
+
+            // Check for free bits in q9 and q10
+            let q9_free_mask = !(masks[8].fixed_bits() | !q[11]);
+            let q10_free_mask = !(masks[9].fixed_bits() | q[11]);
+
+            let mut q9_free_count = q9_free_mask.count_ones() as usize;
+            let mut q10_free_count = q10_free_mask.count_ones() as usize;
+
+            let q9_max = 1 << q9_free_count;
+            let q10_max = 1 << q10_free_count;
+
+            let mut q9_free_indecies = vec![];
+            let mut q10_free_indecies = vec![];
+
+            for i in 0..32_u32 {
+                let bit = 1 << i;
+                if q9_free_mask & bit != 0 {q9_free_indecies.push(i)}
+                if q10_free_mask & bit != 0 {q10_free_indecies.push(i)}
+            }
+
+            while q10_free_count + q10_free_count > 15 {
+                if q9_free_count >= q10_free_count && q9_free_count > 0 {
+                    q9_free_count -= 1;
+                } else if q10_free_count > 0 {
+                    q10_free_count -= 1;
+                }
+            }
+            // println!("{}", q10_free_count + q10_free_count);
+
+            // 4. Loop over all possible Q_9, Q_10 satisfying conditions such that m_11 does not change
+            let q9_base = q[9];
+            let q10_base = q[10];
+
+            for mask9 in 0..q9_max {
+                // Calculating next q9 value that respects the fixed bits
+                let mut q9_candidate = q9_base;
+                for i in 0..q9_free_count {
+                    let bit = 1 << q9_free_indecies[i];
+                    if mask9 & (1 << i) != 0 {
+                        q9_candidate |= bit;
+                    } else {
+                        q9_candidate &= !bit;
+                    }
+                }
+
+                for mask10 in 0..q10_max {
+                    // Calculating next q10 value that respects the fixed bits
+                    let mut q10_candidate = q10_base;
+                    for i in 0..q10_free_count {
+                        let bit = 1 << q10_free_indecies[i];
+                        if mask10 & (1 << i) != 0 {
+                            q10_candidate |= bit;
+                        } else {
+                            q10_candidate &= !bit;
+                        }
+                    }
+
+                    let m11 = q[12]
+                        .wrapping_sub(q[11])
+                        .rotate_right(s[0][11 % 4] as u32)
+                        .wrapping_sub(q[8])
+                        .wrapping_sub(f(q[11], q10_candidate, q9_candidate))
+                        .wrapping_sub(t[11]);
+
+                    if m11 != m1[11] { continue }
+
+                    q[9] = q9_candidate;
+                    q[10] = q10_candidate;
+
+                    // 4.a) Calculate m_8, m_9, m_10, m_12, m_13 -> we skip m_11
+                    for i in 8..=13 {
+                        inverse!(f, q[i + 1], q[i], q[i - 1], q[i - 2], i, s[0][i % 4], i, q[i - 3]);
+                    }
+
+                    // 4.b) Calculate Q_22, ..., Q_64
+                    // 4.c) Verify conditions on Q_22, ..., Q_64, T_22, T_34
+                    let oldest_bit = 1 << 31;
+                    let mut i = 21;
+                    let (mut k, inc) = x[1];
+                    k += 5 * inc;
+                    k %= 16;
+
+                    // println!("{}", k);
+                    sixteen!(g, q[i + 1], q[i], q[i - 1], q[i - 2], k, s[1][i % 4], i, q[i - 3]); // Q_22
+                    if !Self::check_q(q[i + 1], q[i], &masks[i]) {
+                        continue;
+                    }
+                    let t22 = q[i + 1].wrapping_sub(q[i]).rotate_right(s[1][i % 4] as u32);
+                    if t22 & (1 << 17) != 0 { continue }
+                    increment!(k, inc, i);
+                    sixteen!(g, q[i + 1], q[i], q[i - 1], q[i - 2], k, s[1][i % 4], i, q[i - 3]); // Q_23
+                    if !Self::check_q(q[i + 1], q[i], &masks[i]) {
+                        continue;
+                    }
+                    increment!(k, inc, i);
+                    sixteen!(g, q[i + 1], q[i], q[i - 1], q[i - 2], k, s[1][i % 4], i, q[i - 3]); // Q_24
+                    if !Self::check_q(q[i + 1], q[i], &masks[i]) {
+                        continue;
+                    }
+                    increment!(k, inc, i);
+
+                    sixteen!(g, q[i + 1], q[i], q[i - 1], q[i - 2], k, s[1][i % 4], i, q[i - 3]); // Q_25
+                    increment!(k, inc, i);
+                    sixteen!(g, q[i + 1], q[i], q[i - 1], q[i - 2], k, s[1][i % 4], i, q[i - 3]); // Q_26
+                    increment!(k, inc, i);
+                    sixteen!(g, q[i + 1], q[i], q[i - 1], q[i - 2], k, s[1][i % 4], i, q[i - 3]); // Q_27
+                    increment!(k, inc, i);
+                    sixteen!(g, q[i + 1], q[i], q[i - 1], q[i - 2], k, s[1][i % 4], i, q[i - 3]); // Q_28
+                    increment!(k, inc, i);
+                    sixteen!(g, q[i + 1], q[i], q[i - 1], q[i - 2], k, s[1][i % 4], i, q[i - 3]); // Q_29
+                    increment!(k, inc, i);
+                    sixteen!(g, q[i + 1], q[i], q[i - 1], q[i - 2], k, s[1][i % 4], i, q[i - 3]); // Q_30
+                    increment!(k, inc, i);
+                    sixteen!(g, q[i + 1], q[i], q[i - 1], q[i - 2], k, s[1][i % 4], i, q[i - 3]); // Q_31
+                    increment!(k, inc, i);
+                    sixteen!(g, q[i + 1], q[i], q[i - 1], q[i - 2], k, s[1][i % 4], i, q[i - 3]); // Q_32
+                    increment!(k, inc, i);
+
+                    // round 3
+                    let (mut k, inc) = x[2];
+                    sixteen!(h, q[i + 1], q[i], q[i - 1], q[i - 2], k, s[2][i % 4], i, q[i - 3]); // Q_33
+                    increment!(k, inc, i);
+                    sixteen!(h, q[i + 1], q[i], q[i - 1], q[i - 2], k, s[2][i % 4], i, q[i - 3]); // Q_34
+                    let t34 = q[i + 1].wrapping_sub(q[i]).rotate_right(s[2][i % 4] as u32);
+                    if t34 & (1 << 15) != 0 { continue }
+                    increment!(k, inc, i);
+                    sixteen!(h, q[i + 1], q[i], q[i - 1], q[i - 2], k, s[2][i % 4], i, q[i - 3]); // Q_35
+                    increment!(k, inc, i);
+                    sixteen!(h, q[i + 1], q[i], q[i - 1], q[i - 2], k, s[2][i % 4], i, q[i - 3]); // Q_36
+                    increment!(k, inc, i);
+                    sixteen!(h, q[i + 1], q[i], q[i - 1], q[i - 2], k, s[2][i % 4], i, q[i - 3]); // Q_37
+                    increment!(k, inc, i);
+                    sixteen!(h, q[i + 1], q[i], q[i - 1], q[i - 2], k, s[2][i % 4], i, q[i - 3]); // Q_38
+                    increment!(k, inc, i);
+                    sixteen!(h, q[i + 1], q[i], q[i - 1], q[i - 2], k, s[2][i % 4], i, q[i - 3]); // Q_39
+                    increment!(k, inc, i);
+                    sixteen!(h, q[i + 1], q[i], q[i - 1], q[i - 2], k, s[2][i % 4], i, q[i - 3]); // Q_40
+                    increment!(k, inc, i);
+                    sixteen!(h, q[i + 1], q[i], q[i - 1], q[i - 2], k, s[2][i % 4], i, q[i - 3]); // Q_41
+                    increment!(k, inc, i);
+                    sixteen!(h, q[i + 1], q[i], q[i - 1], q[i - 2], k, s[2][i % 4], i, q[i - 3]); // Q_42
+                    increment!(k, inc, i);
+                    sixteen!(h, q[i + 1], q[i], q[i - 1], q[i - 2], k, s[2][i % 4], i, q[i - 3]); // Q_43
+                    increment!(k, inc, i);
+                    sixteen!(h, q[i + 1], q[i], q[i - 1], q[i - 2], k, s[2][i % 4], i, q[i - 3]); // Q_44
+                    increment!(k, inc, i);
+                    sixteen!(h, q[i + 1], q[i], q[i - 1], q[i - 2], k, s[2][i % 4], i, q[i - 3]); // Q_45
+                    increment!(k, inc, i);
+                    sixteen!(h, q[i + 1], q[i], q[i - 1], q[i - 2], k, s[2][i % 4], i, q[i - 3]); // Q_46
+                    increment!(k, inc, i);
+                    sixteen!(h, q[i + 1], q[i], q[i - 1], q[i - 2], k, s[2][i % 4], i, q[i - 3]); // Q_47
+                    increment!(k, inc, i);
+                    sixteen!(h, q[i + 1], q[i], q[i - 1], q[i - 2], k, s[2][i % 4], i, q[i - 3]); // Q_48
+                    if q[i + 1] & oldest_bit != q[i - 1] & oldest_bit { continue }
+                    increment!(k, inc, i);
+
+                    // round 4
+                    let (mut k, inc) = x[3];
+                    let ii = bit_functions::i;
+                    sixteen!(ii, q[i + 1], q[i], q[i - 1], q[i - 2], k, s[3][i % 4], i, q[i - 3]); // Q_49
+                    if q[i + 1] & oldest_bit != q[i - 1] & oldest_bit { continue }
+                    increment!(k, inc, i);
+                    sixteen!(ii, q[i + 1], q[i], q[i - 1], q[i - 2], k, s[3][i % 4], i, q[i - 3]); // Q_50
+                    if q[i + 1] & oldest_bit == q[i - 1] & oldest_bit { continue }
+                    increment!(k, inc, i);
+                    sixteen!(ii, q[i + 1], q[i], q[i - 1], q[i - 2], k, s[3][i % 4], i, q[i - 3]); // Q_51
+                    if q[i + 1] & oldest_bit != q[i - 1] & oldest_bit { continue }
+                    increment!(k, inc, i);
+                    sixteen!(ii, q[i + 1], q[i], q[i - 1], q[i - 2], k, s[3][i % 4], i, q[i - 3]); // Q_52
+                    if q[i + 1] & oldest_bit != q[i - 1] & oldest_bit { continue }
+                    increment!(k, inc, i);
+                    sixteen!(ii, q[i + 1], q[i], q[i - 1], q[i - 2], k, s[3][i % 4], i, q[i - 3]); // Q_53
+                    if q[i + 1] & oldest_bit != q[i - 1] & oldest_bit { continue }
+                    increment!(k, inc, i);
+                    sixteen!(ii, q[i + 1], q[i], q[i - 1], q[i - 2], k, s[3][i % 4], i, q[i - 3]); // Q_54
+                    if q[i + 1] & oldest_bit != q[i - 1] & oldest_bit { continue }
+                    increment!(k, inc, i);
+                    sixteen!(ii, q[i + 1], q[i], q[i - 1], q[i - 2], k, s[3][i % 4], i, q[i - 3]); // Q_55
+                    if q[i + 1] & oldest_bit != q[i - 1] & oldest_bit { continue }
+                    increment!(k, inc, i);
+                    sixteen!(ii, q[i + 1], q[i], q[i - 1], q[i - 2], k, s[3][i % 4], i, q[i - 3]); // Q_56
+                    if q[i + 1] & oldest_bit != q[i - 1] & oldest_bit { continue }
+                    increment!(k, inc, i);
+                    sixteen!(ii, q[i + 1], q[i], q[i - 1], q[i - 2], k, s[3][i % 4], i, q[i - 3]); // Q_57
+                    if q[i + 1] & oldest_bit != q[i - 1] & oldest_bit { continue }
+                    increment!(k, inc, i);
+                    sixteen!(ii, q[i + 1], q[i], q[i - 1], q[i - 2], k, s[3][i % 4], i, q[i - 3]); // Q_58
+                    if q[i + 1] & oldest_bit != q[i - 1] & oldest_bit { continue }
+                    increment!(k, inc, i);
+                    sixteen!(ii, q[i + 1], q[i], q[i - 1], q[i - 2], k, s[3][i % 4], i, q[i - 3]); // Q_59
+                    if q[i + 1] & oldest_bit != q[i - 1] & oldest_bit { continue }
+                    increment!(k, inc, i);
+                    sixteen!(ii, q[i + 1], q[i], q[i - 1], q[i - 2], k, s[3][i % 4], i, q[i - 3]); // Q_60
+                    if q[i + 1] & oldest_bit == q[i - 1] & oldest_bit { continue }
+                    increment!(k, inc, i);
+                    sixteen!(ii, q[i + 1], q[i], q[i - 1], q[i - 2], k, s[3][i % 4], i, q[i - 3]); // Q_61
+                    if q[i + 1] & oldest_bit != q[i - 1] & oldest_bit { continue }
+                    increment!(k, inc, i);
+                    sixteen!(ii, q[i + 1], q[i], q[i - 1], q[i - 2], k, s[3][i % 4], i, q[i - 3]); // Q_62
+                    if q[i + 1] & oldest_bit != q[i - 1] & oldest_bit { continue }
+                    increment!(k, inc, i);
+                    sixteen!(ii, q[i + 1], q[i], q[i - 1], q[i - 2], k, s[3][i % 4], i, q[i - 3]); // Q_63
+                    if q[i + 1] & oldest_bit != q[i - 1] & oldest_bit { continue }
+                    increment!(k, inc, i);
+                    sixteen!(ii, q[i + 1], q[i], q[i - 1], q[i - 2], k, s[3][i % 4], i, q[i - 3]); // Q_64
+
+                    // let m11 = m1.map(|word| word.swap_bytes());
+                    let mut m1p = m1.clone();
+                    m1p[4] = m1p[4].wrapping_add(1 << 31);
+                    m1p[11] = m1p[11].wrapping_sub(1 << 15);
+                    m1p[14] = m1p[14].wrapping_add(1 << 31);
+
+                    let h = Md5::new_with_state_raw_block(&m1, state.clone());
+                    let hp = Md5::new_with_state_raw_block(&m1p, state2.clone());
+
+                    if h == hp {
+                        return Some(m1);
+                    } else {
+                        c.fetch_add(1, Ordering::Relaxed);
+                        continue 'main;
+                    }
+
+                    // Stop searching if all conditions are satisfied and a near-collision is verified
+                    // return Some(m1);
+                }
+
+                if mask9 == q9_max - 1 {
+                    continue 'main;
+                }
             }
         }
-        // println!("After part 3");
-
-        // 4. Loop over all possible Q_9, Q_10 satisfying conditions such that m_11 does not change
-        let f11 = q[12]
-            .wrapping_sub(q[11])
-            .rotate_right(s[0][11 % 4] as u32)
-            .wrapping_sub(q[8])
-            .wrapping_sub(m1[11])
-            .wrapping_sub(t[11]);
-        let mask = 0x80000000;
-        let is = consts::I_IDNEXES;
-        let js = consts::J_IDNEXES;
-        let ks = consts::K_IDNEXES;
-
-        let q9mask: Vec<u32> = (0..(1 << 5))
-            .map(|k| {
-                let msk = (k << 5) ^ (k << 13) ^ (k << 17) ^ (k << 24);
-                (msk & 0x0008_4000) as u32
-            })
-            .collect();
-
-        let q10mask: Vec<u32> = (0..(1 << 5))
-            .map(|k| {
-                let msk = (k << 5) ^ (k << 13) ^ (k << 17) ^ (k << 24);
-                (msk & 0x1800_0020) as u32
-            })
-            .collect();
-
-        q[9] = rng.random();
-        q[9] = (q[9] & q[11]) | (f11 & q[11]);
-        let temp = q[8];
-        Self::modify_bit(&mut q[9], temp, &masks[8]);
-
-        q[10] = rng.random();
-        q[10] = (q[10] & !q[11]) | (f11 & !q[11]);
-        let temp = q[9];
-        Self::modify_bit(&mut q[10], temp, &masks[9]);
-
-        let q9_base = q[9];
-        let q10_base = q[10];
-
-        'loop_4: for &m10_mask in &q10mask {
-            q[10] = q10_base ^ m10_mask;
-
-            for &m9_mask in &q9mask {
-                q[9] = q9_base ^ m9_mask;
-
-                // teraz (tak jak w oryginale) stosujemy modyfikację bitów zależną od poprzedniego Q:
-                // (jeżeli chcesz nadal używać modify_bit: zastosuj ją _po_ ustawieniu kandydatów)
-                let temp8 = q[8];
-                Self::modify_bit(&mut q[9], temp8, &masks[8]);
-                let temp9 = q[9];
-                Self::modify_bit(&mut q[10], temp9, &masks[9]);
-
-                // 4.a) Calculate m_8, m_9, m_10, m_12, m_13 -> we skip m_11
-                inverse!(f, q[9], q[8], q[7], q[6], 8, s[0][8 % 4], 8, q[5]); // m_8
-                inverse!(f, q[10], q[9], q[8], q[7], 9, s[0][9 % 4], 9, q[6]); // m_9
-                inverse!(f, q[11], q[10], q[9], q[8], 10, s[0][10 % 4], 10, q[7]); // m_10
-                inverse!(f, q[13], q[12], q[11], q[10], 12, s[0][12 % 4], 12, q[9]); // m_12
-                inverse!(f, q[14], q[13], q[12], q[11], 13, s[0][13 % 4], 13, q[10]); // m_13
-
-                // Calculate Q_22, ..., Q_64
-                let mut round = 1;
-                let functions = [f, g, h, i];
-                let mut func = functions[round];
-                let (mut k, mut inc) = x[round];
-                k += inc * (22 - 16);
-                k %= 16;
-
-                let mut _dummy = 0;
-                for i in 22..=64 {
-                    let (b, c, d, a_old) = (q[i - 1], q[i - 2], q[i - 3], q[i - 4]);
-                    sixteen!(func, q[i], b, c, d, k, s[round][(i - 1) % 4], i - 1, a_old);
-                    increment!(k, inc, _dummy);
-
-                    if i % 16 == 0 && i != 64 {
-                        round += 1;
-                        func = functions[round];
-                        (k, inc) = x[round];
-                    }
-                }
-
-                // Verify conditions on Q_22, ..., Q_64, T_22, T_34
-                for i in 22..=24 {
-                    let Mask {zero, one, copy, copy_not} = masks[i - 1];
-                    if q[i] & zero != 0
-                        || q[i] & one != one
-                        || q[i] & copy != q[i - 1] & copy
-                        || q[i] & copy_not != !q[i - 1] & copy_not
-                    {
-                        continue 'loop_4;
-                    }
-                }
-
-                let i_bit = q[is[0]] & mask;
-                let j_bit = q[js[0]] & mask;
-                let k_bit = q[ks[0]] & mask;
-                if k_bit == i_bit {
-                    continue 'loop_4;
-                }
-                for i in is {
-                    if q[i] & mask != i_bit {
-                        continue 'loop_4;
-                    }
-                }
-                for j in js {
-                    if q[j] & mask != j_bit {
-                        continue 'loop_4;
-                    }
-                }
-                for k in ks {
-                    if q[k] & mask != k_bit {
-                        continue 'loop_4;
-                    }
-                }
-
-                let (k, inc) = x[1];
-                let t22_mask = 1 << 17;
-                let t22 = g(q[22], q[21], q[20]) + q[19] + t[22] + m1[(k + inc * 22) % 16];
-                let (k, inc) = x[2];
-                let t34_mask = 1 << 15;
-                let t34 = h(q[34], q[33], q[32]) + q[31] + t[34] + m1[(k + inc * 34) % 16];
-                if t22 & t22_mask != 0 || t34 & t34_mask != 0 {
-                    continue 'loop_4;
-                }
-
-                // Stop searching if all conditions are satisfied and a near-collision is verified
-                return  Some(State::new_with_values(q[61], q[64], q[63], q[62]));
-            }
-        }
-
-        None
     }
 
     fn log_data(counter: Arc<AtomicU64>, counter_near: Arc<AtomicU64>, found: Arc<AtomicBool>) {
         thread::spawn(move || {
             while !found.load(Ordering::Relaxed) {
-                thread::sleep(Duration::from_secs(1800));
+                thread::sleep(Duration::from_secs(5));
                 let c = counter.load(Ordering::Relaxed);
                 let c2 = counter_near.load(Ordering::Relaxed);
                 println!(
@@ -295,50 +420,46 @@ impl CollisionFinder {
         let found = Arc::new(AtomicBool::new(false));
         let result = Arc::new(Mutex::new([0u32; 16]));
         let counter = Arc::new(AtomicU64::new(0));
-        let counter_near = Arc::new(AtomicU64::new(0));
+        let counter_near: Arc<AtomicU64> = Arc::new(AtomicU64::new(0));
 
-
-        Self::log_data(counter.clone(), counter_near.clone(), found.clone());
-
-        (0..(1_u64 << 40)).into_par_iter().for_each(|_| {
-            counter.fetch_add(1, Ordering::Relaxed);
-            let mut m1 = Self::random_message();
-            let mut h = match Self::process_message(&mut m1, &iv_0) {
-                Some(v) => v,
-                None => return,
-            };
-            h += iv_0;
-
-            let m1_prim: Vec<u32> = m1
-                .iter()
-                .zip(self.delta_m1.iter())
-                .map(|(&x, &y)| {
-                    ((x as i64 + y + (1 << 32)) % (1 << 32)) as u32
-                })
-                .collect();
-            let h_prim = Md5::new_with_state_raw_block(&m1_prim, iv_0_prim);
-
-            if h.get_hash() == h_prim.get_hash() {
-                if Md5::new_with_state_raw_block(&m1, iv_0).get_hash()
-                    == Md5::new_with_state_raw_block(&m1_prim, iv_0_prim).get_hash()
-                {
-                    println!(
-                        "{} -> Gloria! Gloria! Hallelujah!!!\n\tFound!!! {:?}",
-                        chrono::Local::now().format("%Y-%m-%d %H:%M:%S"),
-                        m1,
-                    );
+        thread::scope(|s| {
+            s.spawn(|| Self::log_data(counter.clone(), counter_near.clone(), found.clone()));
+            for _ in 0..11 {s.spawn(|| {
+                counter.fetch_add(1, Ordering::Relaxed);
+                if let Some(m1) = Self::process_message(&iv_0, &iv_0_prim, counter_near.clone()) {
                     *result.lock().unwrap() = m1;
-                    found.store(true, Ordering::Relaxed);
-                    return;
-                } else {
-                    println!(
-                        "{} -> False positive {:?}",
-                        chrono::Local::now().format("%Y-%m-%d %H:%M:%S"),
-                        m1,
-                    );
                 }
-            }
-            counter_near.fetch_add(1, Ordering::Relaxed);
+                // let h = Md5::new_with_state_raw_block(&m1, iv_0);
+
+                // let m1_prim: Vec<u32> = m1
+                //     .iter()
+                //     .zip(self.delta_m1.iter())
+                //     .map(|(&x, &y)| ((x as i64 + y + (1 << 32)) % (1 << 32)) as u32)
+                //     .collect();
+                // let h_prim = Md5::new_with_state_raw_block(&m1_prim, iv_0_prim);
+
+                // if h.get_hash() == h_prim.get_hash() {
+                //     if Md5::new_with_state_raw_block(&m1, iv_0).get_hash()
+                //         == Md5::new_with_state_raw_block(&m1_prim, iv_0_prim).get_hash()
+                //     {
+                //         println!(
+                //             "{} -> Gloria! Gloria! Hallelujah!!!\n\tFound!!! {:?}",
+                //             chrono::Local::now().format("%Y-%m-%d %H:%M:%S"),
+                //             m1,
+                //         );
+                //         *result.lock().unwrap() = m1;
+                //         found.store(true, Ordering::Relaxed);
+                //         break;
+                //     } else {
+                //         println!(
+                //             "{} -> False positive {:?}",
+                //             chrono::Local::now().format("%Y-%m-%d %H:%M:%S"),
+                //             m1,
+                //         );
+                //     }
+                // }
+                // counter_near.fetch_add(1, Ordering::Relaxed);
+            });}
         });
 
         *result.lock().unwrap()
