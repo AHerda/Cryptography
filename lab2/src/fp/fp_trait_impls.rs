@@ -1,19 +1,34 @@
 use std::ops::{Add, Div, Mul, Rem, Sub};
 
-use super::{Fp, ModType, P};
+use super::{Fp, FpMustHave, ModType, P};
 
 impl<T> Fp<T>
 where
-    T: Add + Rem<ModType, Output = T> + Div + Mul + Sub + Eq + Copy,
+    T: FpMustHave,
+    ModType: Sub<T, Output = T>,
 {
     pub fn new(number: T) -> Self {
         Self(number % P)
+    }
+
+    pub fn negative(&self) -> Self {
+        Self::new(P - self.0)
+    }
+
+    pub fn inverse(&self) -> Self {
+        for i in 0..P {
+            if self.0 * Fp(i.into()).0 == Fp(T::from(1)).0 {
+                return Self::new(i.into());
+            }
+        }
+        unreachable!()
     }
 }
 
 impl<T> Add for Fp<T>
 where
-    T: Add<Output = T> + Rem<ModType, Output = T> + Div + Mul + Sub + Eq + Copy,
+    T: FpMustHave,
+    ModType: Sub<T, Output = T>,
 {
     type Output = Fp<T>;
 
@@ -24,25 +39,20 @@ where
 
 impl<T> Sub for Fp<T>
 where
-    T: Add
-        + Add<ModType, Output = T>
-        + Rem<ModType, Output = T>
-        + Div
-        + Mul
-        + Sub<Output = T>
-        + Eq
-        + Copy,
+    T: FpMustHave,
+    ModType: Sub<T, Output = T>,
 {
     type Output = Fp<T>;
 
     fn sub(self, other: Self) -> Self {
-        Self::new(self.0 + P - other.0)
+        self + other.negative()
     }
 }
 
 impl<T> Mul for Fp<T>
 where
-    T: Add + Rem<ModType, Output = T> + Div + Mul<Output = T> + Sub + Eq + Copy,
+    T: FpMustHave,
+    ModType: Sub<T, Output = T>,
 {
     type Output = Fp<T>;
 
@@ -53,11 +63,12 @@ where
 
 impl<T> Div for Fp<T>
 where
-    T: Add + Rem<ModType, Output = T> + Div<Output = T> + Mul + Sub + Eq + Copy,
+    T: FpMustHave,
+    ModType: Sub<T, Output = T>,
 {
     type Output = Fp<T>;
 
     fn div(self, other: Self) -> Self {
-        Self::new(self.0 / other.0)
+        self * other.inverse()
     }
 }

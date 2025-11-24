@@ -5,8 +5,23 @@ mod fp_trait_impls;
 type ModType = u32;
 const P: ModType = 19;
 
+pub trait FpMustHave:
+    Add<Output = Self>
+    + Rem<ModType, Output = Self>
+    + Div<Output = Self>
+    + Mul<Output = Self>
+    + Sub<Output = Self>
+    + Eq
+    + Copy
+    + Default
+    + From<ModType>
+{
+}
+
 #[derive(Debug, PartialEq, Eq, PartialOrd, Copy, Clone)]
-pub struct Fp<T: Add + Sub + Mul + Div + Rem<ModType> + Eq + Copy>(T);
+pub struct Fp<T: FpMustHave>(T);
+
+impl FpMustHave for ModType {}
 
 #[cfg(test)]
 mod tests {
