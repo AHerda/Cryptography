@@ -1,8 +1,8 @@
 use std::fmt::Display;
-use std::ops::{Add, Div, Mul, Rem, Sub};
+use std::ops::{Add, Div, Mul, Sub};
 
 use super::{Fp, T};
-use crate::pow_trait::Pow;
+use crate::traits::Pow;
 
 impl<const P: T> Fp<P> {
     pub const fn new(number: T) -> Self {
@@ -14,16 +14,21 @@ impl<const P: T> Fp<P> {
     }
 
     pub fn inverse(&self) -> Self {
-        for i in 0..P {
-            if self.0 * i == 1 {
-                return Self::new(i.into());
+        let zero = self.0.zero();
+        for i in (1..=(self.0 * (P - 1))).step_by(P) {
+            if i % self.0 == zero {
+                return Self(i / self.0);
             }
         }
-        unreachable!()
+        panic!("Cannot divide by zero")
     }
 }
 
 impl<const P: T> Pow for Fp<P> {
+    fn zero(&self) -> Self {
+        Fp::new(0)
+    }
+
     fn one(&self) -> Self {
         Fp::new(1)
     }
@@ -36,7 +41,7 @@ impl<const P: T> Display for Fp<P> {
 }
 
 impl<const P: T> Add for Fp<P> {
-    type Output = Fp<P>;
+    type Output = Self;
 
     fn add(self, other: Self) -> Self {
         Self::new(self.0 + other.0)
@@ -44,7 +49,7 @@ impl<const P: T> Add for Fp<P> {
 }
 
 impl<const P: T> Sub for Fp<P> {
-    type Output = Fp<P>;
+    type Output = Self;
 
     fn sub(self, other: Self) -> Self {
         self + other.negative()
@@ -52,19 +57,15 @@ impl<const P: T> Sub for Fp<P> {
 }
 
 impl<const P: T> Mul for Fp<P> {
-    type Output = Fp<P>;
+    type Output = Self;
 
     fn mul(self, other: Self) -> Self {
         Self::new(self.0 * other.0)
     }
 }
 
-impl<const P: T> Div for Fp<P>
-// where
-//     T: FpMustHave,
-//     ModType: Sub<T, Output = T>,
-{
-    type Output = Fp<P>;
+impl<const P: T> Div for Fp<P> {
+    type Output = Self;
 
     fn div(self, other: Self) -> Self {
         self * other.inverse()

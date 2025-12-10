@@ -3,198 +3,76 @@ use std::ops::{Add, Div, Mul, Rem, Sub};
 
 use super::{Fpk, T};
 use crate::fp::Fp;
-use crate::pow_trait::Pow;
+use crate::polynomials::Polynomial;
+use crate::traits::Pow;
 
 impl<const P: T, const K: T> Fpk<P, K> {
-    pub fn new(coef: Vec<T>, modulo: [Fp<P>; K]) -> Self {
-        Self::new_mod_numbers(coef.into_iter().map(Fp::new).collect(), modulo)
-    }
-
-    pub fn new_mod_numbers(coef: Vec<Fp<P>>, modulo: [Fp<P>; K]) -> Self {
-        let mut poly = Self{
-            poly: coef,
-            modulo
-        };
-
-        poly.normalize();
-
-        if poly.poly.len() >= K {
-            poly.clone() % Fpk{ poly: poly.modulo.to_vec(), modulo: poly.modulo.clone() }
-        } else {
-            poly
+    pub fn new(poly: Polynomial<Fp<P>>, modulo: Polynomial<Fp<P>>) -> Self {
+        assert_eq!(
+            modulo.degree().expect("modulo must have a positive degree"),
+            K
+        );
+        Self {
+            poly: poly % modulo.clone(),
+            modulo,
         }
     }
 
     fn match_mods(lhs: &Self, rhs: &Self) -> bool {
-        lhs.modulo.iter().zip(rhs.modulo.iter()).all(|(a, b)| a == b)
+        lhs.modulo
+            .coefficients()
+            .iter()
+            .zip(rhs.modulo.coefficients().iter())
+            .all(|(a, b)| a == b)
     }
 
     fn degree(&self) -> Option<usize> {
-        if self.poly.is_empty() {
-            None
-        } else {
-            Some(self.poly.len() - 1)
-        }
+        self.poly.degree()
     }
 
     pub fn coefficients(&self) -> Vec<Fp<P>> {
-        self.poly.clone()
-    }
-
-    fn normalize(&mut self) {
-        let zero_val = Fp::new(0);
-        while let Some(last) = self.poly.last() {
-            if *last == zero_val {
-                self.poly.pop();
-            } else {
-                break;
-            }
-        }
-    }
-
-    // pub const fn create_unredeucable_polynomial() -> Self {
-
-    // }
-
-    fn div_rem(&self, rhs: &Self) -> (Self, Self) {
-        let mut remainder = self.clone();
-        remainder.normalize();
-
-        let mut divisor = rhs.clone();
-        divisor.normalize();
-
-        if divisor.poly.is_empty() {
-            panic!("Division by zero polynomial");
-        }
-
-        let rhs_deg = divisor.degree().unwrap();
-        let mut quotient_vec = vec![Fp::new(0); std::cmp::max(1, remainder.poly.len())];
-
-        // While degree(remainder) >= degree(divisor)
-        while let Some(rem_deg) = remainder.degree() {
-            if rem_deg < rhs_deg {
-                break;
-            }
-
-            let deg_diff = rem_deg - rhs_deg;
-
-            // scale = lead(remainder) / lead(divisor)
-            let lead_rem = *remainder.poly.last().unwrap();
-            let lead_div = *divisor.poly.last().unwrap();
-            let scale = lead_rem / lead_div;
-
-            // Update quotient
-            // Note: In a proper vector implementation, we need to handle sizing
-            if deg_diff >= quotient_vec.len() {
-                quotient_vec.resize(deg_diff + 1, Fp::new(0));
-            }
-            quotient_vec[deg_diff] = scale;
-
-            // Subtract (divisor * scale * x^deg_diff) from remainder
-            for (i, coeff) in divisor.poly.iter().enumerate() {
-                let target_idx = i + deg_diff;
-                if target_idx < remainder.poly.len() {
-                    remainder.poly[target_idx] = remainder.poly[target_idx] - (*coeff * scale);
-                }
-            }
-
-            remainder.normalize();
-        }
-
-        // Clean up quotient
-        let mut quotient = Fpk{ poly: quotient_vec, modulo: self.modulo.clone() };
-        quotient.normalize();
-
-        (quotient, remainder.clone())
+        self.poly.coefficients()
     }
 }
 
 impl<const P: T, const K: T> Pow for Fpk<P, K> {
+    fn zero(&self) -> Self {
+        Self::new(self.poly.zero(), self.modulo.clone())
+    }
     fn one(&self) -> Self {
-        Fpk::new(vec![1], self.modulo.clone())
+        Self::new(self.poly.one(), self.modulo.clone())
     }
 }
 
 impl<const P: T, const K: T> Display for Fpk<P, K> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        if self.poly.is_empty() {
-            return write!(f, "0");
-        }
-
-        for (i, coeff) in self.poly.iter().enumerate().rev() {
-            if *coeff == Fp::new(0) {
-                continue;
-            }
-
-            if i == self.poly.len() - 1 {
-                write!(f, "{}", coeff)?;
-            } else if *coeff == Fp::new(1) {
-                write!(f, " + ")?;
-            } else {
-                write!(f, " + {}", coeff)?;
-            }
-
-            if i > 0 {
-                if *coeff != Fp::new(1) {
-                    write!(f, "*")?;
-                }
-                write!(f, "x")?;
-                if i > 1 {
-                    write!(f, "^{}", i)?;
-                }
-            }
-        }
-        Ok(())
+        write!(f, "{}", self.poly)
     }
 }
 
 impl<const P: T, const K: T> Add for Fpk<P, K> {
-    type Output = Fpk<P, K>;
+    type Output = Self;
 
     fn add(self, other: Self) -> Self {
         assert!(Self::match_mods(&self, &other));
 
-        let mut result = Fpk{
-            poly: (0..std::cmp::max(self.poly.len(), other.poly.len()))
-                .map(|i| {
-                    if i < self.poly.len() && i < other.poly.len() {
-                        self.poly[i] + other.poly[i]
-                    } else if i < self.poly.len() {
-                        self.poly[i]
-                    } else {
-                        other.poly[i]
-                    }
-                })
-                .collect::<Vec<Fp<P>>>(),
-            modulo: self.modulo.clone(),
-        };
-        result.normalize();
-        result
+        Self {
+            poly: self.poly + other.poly,
+            modulo: self.modulo,
+        }
     }
 }
 
 impl<const P: T, const K: T> Sub for Fpk<P, K> {
-    type Output = Fpk<P, K>;
+    type Output = Self;
 
     fn sub(self, other: Self) -> Self {
         assert!(Self::match_mods(&self, &other));
 
-        let mut result = Fpk{
-            poly: (0..std::cmp::max(self.poly.len(), other.poly.len()))
-                .map(|i| {
-                    if i < self.poly.len() && i < other.poly.len() {
-                        self.poly[i] - other.poly[i]
-                    } else if i < self.poly.len() {
-                        self.poly[i]
-                    } else {
-                        other.poly[i]
-                    }
-                })
-                .collect::<Vec<Fp<P>>>(),
-            modulo: self.modulo.clone()
-        };
-        result.normalize();
-        result
+        Self {
+            poly: self.poly - other.poly,
+            modulo: self.modulo,
+        }
     }
 }
 
@@ -204,39 +82,35 @@ impl<const P: T, const K: T> Mul for Fpk<P, K> {
     fn mul(self, other: Self) -> Self {
         assert!(Self::match_mods(&self, &other));
 
-        if self.poly.is_empty() || other.poly.is_empty() {
-            return Fpk{ poly: vec![], modulo: self.modulo.clone() };
+        Self {
+            poly: (self.poly * other.poly) % self.modulo.clone(),
+            modulo: self.modulo,
         }
-
-        let new_len = self.poly.len() + other.poly.len() - 1;
-        let mut result = vec![Fp::new(0); new_len];
-
-        for (i, a_val) in self.poly.iter().enumerate() {
-            for (j, b_val) in other.poly.iter().enumerate() {
-                result[i + j] = result[i + j] + (*a_val * *b_val);
-            }
-        }
-
-        Self::new_mod_numbers(result, self.modulo)
     }
 }
 
 impl<const P: T, const K: T> Div for Fpk<P, K> {
-    type Output = Fpk<P, K>;
+    type Output = Self;
 
     fn div(self, other: Self) -> Self {
         assert!(Self::match_mods(&self, &other));
 
-        self.div_rem(&other).0
+        Self {
+            poly: self.poly / other.poly,
+            modulo: self.modulo,
+        }
     }
 }
 
 impl<const P: T, const K: T> Rem for Fpk<P, K> {
-    type Output = Fpk<P, K>;
+    type Output = Self;
 
     fn rem(self, other: Self) -> Self {
         assert!(Self::match_mods(&self, &other));
 
-        self.div_rem(&other).1
+        Self {
+            poly: self.poly % other.poly,
+            modulo: self.modulo,
+        }
     }
 }

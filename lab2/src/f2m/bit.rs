@@ -1,15 +1,36 @@
-use std::ops::{Add, Sub, Mul, Div, BitOr, BitAnd, BitXor, Not, Deref};
 use std::fmt::Display;
+use std::ops::{Add, BitAnd, BitOr, BitXor, Deref, Div, Mul, Not, Sub};
+
+use crate::traits::{Field, Pow};
 
 #[derive(Debug, Copy, Clone, PartialEq, Eq)]
 pub enum Bit {
     Zero,
-    One
+    One,
+}
+
+impl Field for Bit {}
+
+impl Pow for Bit {
+    fn one(&self) -> Self {
+        One
+    }
+
+    fn zero(&self) -> Self {
+        Zero
+    }
+
+    fn pow(self, exponent: usize) -> Self {
+        if self == Zero && exponent == 0 {
+            panic!("Zero raised to the power of zero is undefined");
+        }
+        self
+    }
 }
 
 impl Display for Bit {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self{
+        match self {
             Self::Zero => write!(f, "0"),
             Self::One => write!(f, "1"),
         }
@@ -91,7 +112,7 @@ impl Mul for Bit {
 impl Div for Bit {
     type Output = Bit;
 
-    fn div(self, other: Self) -> Self {
+    fn div(self, _other: Self) -> Self {
         self
     }
 }
