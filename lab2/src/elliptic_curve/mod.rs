@@ -20,6 +20,7 @@ pub enum EcPoint<T: Field> {
 #[derive(Debug)]
 pub enum EcErrors {
     PointNotOnCurve,
+    NoYValueForSpecifiedX,
 }
 
 #[cfg(test)]

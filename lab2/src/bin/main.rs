@@ -1,21 +1,31 @@
 extern crate lab2;
 
-use lab2::{fp::Fp, polynomials::Polynomial};
+use lab2::{
+    f2m::{F2m, bit::Bits8},
+    polynomials::Polynomial,
+};
 
 const P: usize = 19;
 
 fn main() {
-    let p1: Polynomial<Fp<P>> = Polynomial::new(vec![
-        Fp::new(8),
-        Fp::new(0),
-        Fp::new(13),
-        Fp::new(0),
-        Fp::new(1),
-        Fp::new(1),
-    ]);
-    println!("{}", p1);
-    let p2 = Polynomial::new(vec![Fp::new(12), Fp::new(1), Fp::new(0), Fp::new(3)]);
-    println!("{}", p2);
-    let expected = Polynomial::new(vec![Fp::new(18), Fp::new(1), Fp::new(1)]);
-    assert_eq!(p1 % p2, expected);
+    const M: usize = 12;
+    let pk = Polynomial::new(vec![Bits8(0b11110111), Bits8(0b00010000)]);
+    for i in 0..M {
+        println!("i = {}", i);
+        let mut number1: u8 = 1;
+        let mut number2: u8 = if i < 8 { 0 } else { 1 };
+        for j in 0..i {
+            println!("\tj = {}", j);
+            if j < 8 {
+                number1 <<= 1;
+                number1 += 1;
+            } else if j < 16 {
+                number2 <<= 1;
+                number2 += 1;
+            }
+        }
+        let coeff = Polynomial::new(vec![Bits8(number1), Bits8(number2)]);
+        let f2m: F2m<M> = F2m::new(coeff, pk.clone());
+        assert_eq!(f2m.degree(), Some(i));
+    }
 }

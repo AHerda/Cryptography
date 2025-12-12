@@ -12,10 +12,9 @@ impl<T: Field> Polynomial<T> {
     }
 
     pub fn degree(&self) -> Option<usize> {
-        if self.coef.is_empty() {
-            None
-        } else {
-            Some(self.coef.len() - 1)
+        match self.coef.len() {
+            0 => None,
+            n => Some(n - 1),
         }
     }
 

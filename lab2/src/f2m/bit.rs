@@ -1,137 +1,105 @@
 use std::fmt::Display;
-use std::ops::{Add, BitAnd, BitOr, BitXor, Deref, Div, Mul, Neg, Not, Sub};
+use std::ops::{Add, BitAnd, BitOr, BitXor, Div, Mul, Neg, Not, Sub};
 
 use crate::traits::{Field, Pow};
-use Bit::*;
 
 #[derive(Debug, Copy, Clone, PartialEq, Eq)]
-pub enum Bit {
-    Zero,
-    One,
+pub struct Bits8(pub u8);
+
+impl Field for Bits8 {}
+
+impl Display for Bits8 {
+    fn fmt(&self, fmt: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(fmt, "{:b}", self.0)
+    }
 }
 
-impl Field for Bit {}
-
-impl Pow for Bit {
+impl Pow for Bits8 {
     fn one(&self) -> Self {
-        One
+        Self(1)
     }
 
     fn zero(&self) -> Self {
-        Zero
+        Self(0)
     }
 
     fn pow(self, exponent: usize) -> Self {
-        if self == Zero && exponent == 0 {
+        if self == self.zero() && exponent == 0 {
             panic!("Zero raised to the power of zero is undefined");
         }
         self
     }
 }
 
-impl Display for Bit {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            Self::Zero => write!(f, "0"),
-            Self::One => write!(f, "1"),
-        }
-    }
-}
-
-impl Not for Bit {
+impl Not for Bits8 {
     type Output = Self;
 
     fn not(self) -> Self {
-        match self {
-            One => Zero,
-            Zero => One,
-        }
+        Self(!self.0)
     }
 }
 
-impl BitOr for Bit {
+impl BitOr for Bits8 {
     type Output = Self;
 
-    fn bitor(self, other: Self) -> Self {
-        match (self, other) {
-            (Zero, Zero) => Zero,
-            _ => One,
-        }
+    fn bitor(self, other: Self) -> Self::Output {
+        Self(self.0 | other.0)
     }
 }
 
-impl BitAnd for Bit {
-    type Output = Bit;
+impl BitAnd for Bits8 {
+    type Output = Bits8;
 
-    fn bitand(self, other: Self) -> Self {
-        match (self, other) {
-            (One, One) => One,
-            _ => Zero,
-        }
+    fn bitand(self, other: Self) -> Self::Output {
+        Self(self.0 & other.0)
     }
 }
 
-impl BitXor for Bit {
-    type Output = Bit;
+impl BitXor for Bits8 {
+    type Output = Bits8;
 
-    fn bitxor(self, other: Self) -> Self {
-        match (self, other) {
-            (One, One) => Zero,
-            (Zero, Zero) => Zero,
-            (Zero, One) => One,
-            (One, Zero) => One,
-        }
+    fn bitxor(self, other: Self) -> Self::Output {
+        Self(self.0 ^ other.0)
     }
 }
 
-impl Neg for Bit {
-    type Output = Bit;
+impl Neg for Bits8 {
+    type Output = Bits8;
 
-    fn neg(self) -> Self {
+    fn neg(self) -> Self::Output {
         self
     }
 }
 
-impl Add for Bit {
-    type Output = Bit;
+impl Add for Bits8 {
+    type Output = Bits8;
 
     fn add(self, other: Self) -> Self {
         self ^ other
     }
 }
 
-impl Sub for Bit {
-    type Output = Bit;
+impl Sub for Bits8 {
+    type Output = Bits8;
 
     fn sub(self, other: Self) -> Self {
         self ^ other
     }
 }
 
-impl Mul for Bit {
-    type Output = Bit;
+impl Mul for Bits8 {
+    type Output = Bits8;
 
-    fn mul(self, other: Self) -> Self {
+    fn mul(self, other: Self) -> Self::Output {
         self & other
     }
 }
 
-impl Div for Bit {
-    type Output = Bit;
+impl Div for Bits8 {
+    type Output = Bits8;
 
-    fn div(self, _other: Self) -> Self {
-        assert_ne!(_other, Zero, "Division of bits by Zero");
+    fn div(self, other: Self) -> Self {
+        assert_ne!(other, other.zero(), "Division of bits by Zero");
         self
-    }
-}
-
-impl Deref for Bit {
-    type Target = bool;
-
-    fn deref(&self) -> &bool {
-        match self {
-            Zero => &false,
-            One => &true,
-        }
     }
 }
