@@ -1,5 +1,5 @@
 use std::fmt::Display;
-use std::ops::{Add, Div, Mul, Rem, Sub};
+use std::ops::{Add, Div, Mul, Neg, Rem, Sub};
 
 use super::{Fpk, T};
 use crate::fp::Fp;
@@ -16,6 +16,10 @@ impl<const P: T, const K: T> Fpk<P, K> {
             poly: poly % modulo.clone(),
             modulo,
         }
+    }
+
+    fn is_zero(&self) -> bool {
+        self.poly.is_zero()
     }
 
     fn match_mods(lhs: &Self, rhs: &Self) -> bool {
@@ -50,6 +54,17 @@ impl<const P: T, const K: T> Display for Fpk<P, K> {
     }
 }
 
+impl<const P: T, const K: T> Neg for Fpk<P, K> {
+    type Output = Self;
+
+    fn neg(self) -> Self {
+        Self {
+            poly: (self.modulo.clone() - self.poly) % self.modulo.clone(),
+            modulo: self.modulo,
+        }
+    }
+}
+
 impl<const P: T, const K: T> Add for Fpk<P, K> {
     type Output = Self;
 
@@ -69,10 +84,7 @@ impl<const P: T, const K: T> Sub for Fpk<P, K> {
     fn sub(self, other: Self) -> Self {
         assert!(Self::match_mods(&self, &other));
 
-        Self {
-            poly: self.poly - other.poly,
-            modulo: self.modulo,
-        }
+        self + other.neg()
     }
 }
 
@@ -83,7 +95,7 @@ impl<const P: T, const K: T> Mul for Fpk<P, K> {
         assert!(Self::match_mods(&self, &other));
 
         Self {
-            poly: (self.poly * other.poly) % self.modulo.clone(),
+            poly: (self.poly * other.poly) % other.modulo,
             modulo: self.modulo,
         }
     }
@@ -93,6 +105,7 @@ impl<const P: T, const K: T> Div for Fpk<P, K> {
     type Output = Self;
 
     fn div(self, other: Self) -> Self {
+        assert!(!other.is_zero(), "Division of Fpk by zero");
         assert!(Self::match_mods(&self, &other));
 
         Self {
@@ -106,6 +119,7 @@ impl<const P: T, const K: T> Rem for Fpk<P, K> {
     type Output = Self;
 
     fn rem(self, other: Self) -> Self {
+        assert!(!other.is_zero(), "Reminder of Fpk by zero");
         assert!(Self::match_mods(&self, &other));
 
         Self {

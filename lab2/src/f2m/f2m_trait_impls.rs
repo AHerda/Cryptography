@@ -1,5 +1,5 @@
 use std::fmt::Display;
-use std::ops::{Add, Div, Mul, Rem, Sub};
+use std::ops::{Add, Div, Mul, Neg, Rem, Sub};
 
 use super::{Bit, F2m, T};
 use crate::polynomials::Polynomial;
@@ -81,6 +81,17 @@ impl<const M: T> Display for F2m<M> {
     }
 }
 
+impl<const M: T> Neg for F2m<M> {
+    type Output = Self;
+
+    fn neg(self) -> Self {
+        Self {
+            poly: (self.modulo.clone() - self.poly) % self.modulo.clone(),
+            modulo: self.modulo,
+        }
+    }
+}
+
 impl<const M: T> Add for F2m<M> {
     type Output = Self;
 
@@ -100,10 +111,7 @@ impl<const M: T> Sub for F2m<M> {
     fn sub(self, other: Self) -> Self {
         assert!(Self::match_mods(&self, &other));
 
-        Self {
-            poly: self.poly - other.poly,
-            modulo: self.modulo,
-        }
+        self + other.neg()
     }
 }
 
@@ -114,7 +122,7 @@ impl<const M: T> Mul for F2m<M> {
         assert!(Self::match_mods(&self, &other));
 
         Self {
-            poly: self.poly * other.poly,
+            poly: (self.poly * other.poly) % other.modulo,
             modulo: self.modulo,
         }
     }
@@ -124,6 +132,7 @@ impl<const M: T> Div for F2m<M> {
     type Output = F2m<M>;
 
     fn div(self, other: Self) -> Self {
+        assert!(!other.is_zero(), "Division of F2m by zero");
         assert!(Self::match_mods(&self, &other));
 
         Self {
@@ -137,6 +146,7 @@ impl<const M: T> Rem for F2m<M> {
     type Output = F2m<M>;
 
     fn rem(self, other: Self) -> Self {
+        assert!(!other.is_zero(), "Reminder of F2m by zero");
         assert!(Self::match_mods(&self, &other));
 
         Self {

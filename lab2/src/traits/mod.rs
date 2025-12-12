@@ -1,10 +1,13 @@
 use std::fmt::Display;
-use std::ops::{Add, Div, Mul, Sub};
+use std::ops::{Add, Div, Mul, Neg, Sub};
+
+pub mod needed_impls;
 
 pub trait Field:
     Clone
     + PartialEq
     + Eq
+    + Neg<Output = Self>
     + Add<Output = Self>
     + Sub<Output = Self>
     + Mul<Output = Self>
@@ -14,6 +17,7 @@ pub trait Field:
     + Pow
 {
 }
+
 pub trait Pow: std::ops::Mul<Output = Self> + Clone {
     /// Returns the additive identity element of the type.
     fn zero(&self) -> Self;
@@ -37,24 +41,6 @@ pub trait Pow: std::ops::Mul<Output = Self> + Clone {
     }
 }
 
-impl Pow for usize {
-    fn zero(&self) -> Self {
-        0
-    }
-    fn one(&self) -> Self {
-        1
-    }
+pub trait Sqrt: Field {
+    fn sqrt(self) -> Option<Self>;
 }
-
-impl Field for usize {}
-
-impl Pow for isize {
-    fn zero(&self) -> Self {
-        0
-    }
-    fn one(&self) -> Self {
-        1
-    }
-}
-
-impl Field for isize {}

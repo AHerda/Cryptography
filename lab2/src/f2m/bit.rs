@@ -1,7 +1,8 @@
 use std::fmt::Display;
-use std::ops::{Add, BitAnd, BitOr, BitXor, Deref, Div, Mul, Not, Sub};
+use std::ops::{Add, BitAnd, BitOr, BitXor, Deref, Div, Mul, Neg, Not, Sub};
 
 use crate::traits::{Field, Pow};
+use Bit::*;
 
 #[derive(Debug, Copy, Clone, PartialEq, Eq)]
 pub enum Bit {
@@ -36,8 +37,6 @@ impl Display for Bit {
         }
     }
 }
-
-use Bit::*;
 
 impl Not for Bit {
     type Output = Self;
@@ -85,6 +84,14 @@ impl BitXor for Bit {
     }
 }
 
+impl Neg for Bit {
+    type Output = Bit;
+
+    fn neg(self) -> Self {
+        self
+    }
+}
+
 impl Add for Bit {
     type Output = Bit;
 
@@ -113,6 +120,7 @@ impl Div for Bit {
     type Output = Bit;
 
     fn div(self, _other: Self) -> Self {
+        assert_ne!(_other, Zero, "Division of bits by Zero");
         self
     }
 }

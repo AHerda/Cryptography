@@ -1,4 +1,4 @@
-use super::traits::Field;
+use super::traits::{Field, Pow, Sqrt};
 
 mod fp_trait_impls;
 
@@ -19,6 +19,13 @@ mod tests {
         let one: Fp<P> = Fp::new(100);
 
         assert_eq!(one, Fp::new(5));
+    }
+
+    #[test]
+    fn test_negation() {
+        let one: Fp<P> = Fp::new(5);
+
+        assert_eq!(-one, Fp::new(14));
     }
 
     #[test]
@@ -65,5 +72,29 @@ mod tests {
         let two: Fp<P> = Fp::new(2);
 
         assert_eq!(one / two, Fp::new(9));
+    }
+
+    #[test]
+    fn test_pow() {
+        let one: Fp<P> = Fp::new(10);
+        let expected_2: Fp<P> = Fp::new(5);
+        let expected_3: Fp<P> = Fp::new(12);
+        let expected_4: Fp<P> = Fp::new(6);
+
+        assert_eq!(one.clone().pow(2), expected_2);
+        assert_eq!(one.clone().pow(3), expected_3);
+        assert_eq!(one.clone().pow(4), expected_4);
+    }
+
+    #[test]
+    fn test_sqrt() {
+        for i in 0..P {
+            let expected: Fp<P> = Fp::new(i);
+            if expected.pow((P - 1) / 2) == expected.one() {
+                assert_eq!(expected.sqrt().unwrap().pow(2), expected)
+            } else {
+                assert_eq!(expected.sqrt(), None);
+            }
+        }
     }
 }

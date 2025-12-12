@@ -1,8 +1,8 @@
 use std::fmt::Display;
-use std::ops::{Add, Div, Mul, Rem, Sub};
+use std::ops::{Add, Div, Mul, Neg, Rem, Sub};
 
 use super::{Field, Polynomial};
-use crate::traits::Pow;
+use crate::traits::{Pow, Sqrt};
 
 impl<T: Field> Polynomial<T> {
     pub fn new(coef: Vec<T>) -> Self {
@@ -114,6 +114,16 @@ impl<T: Field> Display for Polynomial<T> {
     }
 }
 
+impl<T: Field> Neg for Polynomial<T> {
+    type Output = Self;
+
+    fn neg(self) -> Self {
+        Self {
+            coef: self.coef.into_iter().map(|coef| -coef).collect::<Vec<T>>(),
+        }
+    }
+}
+
 impl<T: Field> Add for Polynomial<T> {
     type Output = Self;
 
@@ -141,15 +151,7 @@ impl<T: Field> Sub for Polynomial<T> {
     type Output = Self;
 
     fn sub(self, other: Self) -> Self {
-        let zero = self.coef[0].zero();
-        let mut result = Self {
-            coef: (0..std::cmp::max(self.coef.len(), other.coef.len()))
-                .map(|i| {
-                    self.coef.get(i).cloned().unwrap_or(zero.clone())
-                        - other.coef.get(i).cloned().unwrap_or(zero.clone())
-                })
-                .collect::<Vec<T>>(),
-        };
+        let mut result = self + other.neg();
         result.normalize();
         result
     }
@@ -180,6 +182,7 @@ impl<T: Field> Div for Polynomial<T> {
     type Output = Self;
 
     fn div(self, other: Self) -> Self {
+        assert!(!other.is_zero(), "Division of Polynomial by zero");
         self.div_rem(&other).0
     }
 }
@@ -188,6 +191,7 @@ impl<T: Field> Rem for Polynomial<T> {
     type Output = Self;
 
     fn rem(self, other: Self) -> Self {
+        assert!(!other.is_zero(), "Reminder of Polynomial by zero");
         self.div_rem(&other).1
     }
 }

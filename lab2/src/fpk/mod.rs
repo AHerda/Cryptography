@@ -1,6 +1,7 @@
 use crate::polynomials::Polynomial;
 
-use super::fp::{Fp, T}; //, FpMustHave};
+use super::fp::{Fp, T};
+use super::traits::Field;
 
 mod fpk_trait_impls;
 
@@ -9,6 +10,8 @@ pub struct Fpk<const P: T, const K: T> {
     poly: Polynomial<Fp<P>>,
     modulo: Polynomial<Fp<P>>,
 }
+
+impl<const P: T, const K: T> Field for Fpk<P, K> {}
 
 #[cfg(test)]
 mod tests {

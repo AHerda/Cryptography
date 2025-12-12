@@ -1,16 +1,12 @@
 use std::fmt::Display;
-use std::ops::{Add, Div, Mul, Sub};
+use std::ops::{Add, Div, Mul, Neg, Sub};
 
 use super::{Fp, T};
-use crate::traits::Pow;
+use crate::traits::{Pow, Sqrt};
 
 impl<const P: T> Fp<P> {
     pub const fn new(number: T) -> Self {
         Self(number % P)
-    }
-
-    pub fn negative(&self) -> Self {
-        Self::new(P - self.0)
     }
 
     pub fn inverse(&self) -> Self {
@@ -26,17 +22,35 @@ impl<const P: T> Fp<P> {
 
 impl<const P: T> Pow for Fp<P> {
     fn zero(&self) -> Self {
-        Fp::new(0)
+        Fp(0)
     }
 
     fn one(&self) -> Self {
-        Fp::new(1)
+        Fp(1)
+    }
+}
+
+impl<const P: T> Sqrt for Fp<P> {
+    fn sqrt(self) -> Option<Self> {
+        if self.pow((P - 1) / 2) != self.one() {
+            None
+        } else {
+            Some(self.pow((P + 1) / 4))
+        }
     }
 }
 
 impl<const P: T> Display for Fp<P> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "{}", self.0)
+    }
+}
+
+impl<const P: T> Neg for Fp<P> {
+    type Output = Self;
+
+    fn neg(self) -> Self {
+        Self::new(P - self.0)
     }
 }
 
@@ -52,7 +66,7 @@ impl<const P: T> Sub for Fp<P> {
     type Output = Self;
 
     fn sub(self, other: Self) -> Self {
-        self + other.negative()
+        self + other.neg()
     }
 }
 
@@ -68,6 +82,7 @@ impl<const P: T> Div for Fp<P> {
     type Output = Self;
 
     fn div(self, other: Self) -> Self {
+        assert_ne!(other, self.zero(), "Division of Polynomial by zero");
         self * other.inverse()
     }
 }
