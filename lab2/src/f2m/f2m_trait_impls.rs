@@ -71,26 +71,38 @@ impl<const M: T> F2m<M> {
         }
     }
 
+    fn get_bit_from_modulo(&self, index: usize) -> bool {
+        let coef = self.modulo.coefficients();
+        let byte_index = index / 8;
+        let bit_index = index % 8;
+
+        if byte_index >= coef.len() {
+            false
+        } else {
+            (coef[byte_index].0 & (1 << bit_index)) != 0
+        }
+    }
+
     fn shift_left(self, shift: usize) -> Self {
         if shift == 0 {
             return self;
         }
 
-        let old_coef = self.coefficients();
-        let mut new_coef = old_coef.clone();
+        let mut coef = self.coefficients();
+        let n = coef.len();
         for _ in 0..((shift - 1) / 8) {
-            new_coef.push(Bits8(0));
+            coef.push(Bits8(0));
         }
 
-        for i in (0..old_coef.len()).rev() {
-            let new_index = i + byte_shift;
-            new_coef[new_index].0 |= coef.0 << bit_shift;
-            if bit_shift != 0 && new_index + 1 < new_coef.len() {
-                new_coef[new_index + 1].0 |= coef.0 >> (8 - bit_shift);
-            }
+        for i in (0..n).rev() {
+            let byte_shitf = shift / 8;
+            let bit_shift = shift % 8;
+
+            coef[i + byte_shitf] = Bits8( coef[i].0 << bit_shift );
+            coef[i + byte_shitf + 1] = Bits8( coef[i].0 >> (8 - bit_shift) );
         }
 
-        Self::new(Polynomial::new(new_coef), self.modulo.clone())
+        Self::new(Polynomial::new(coef), self.modulo.clone())
     }
 }
 
@@ -174,29 +186,29 @@ impl<const M: T> Mul for F2m<M> {
 
         let mut result = self.zero();
         let mut temp = self.clone();
-        
+
         for i in 0..M {
             if other.get_bit(i) {
                 result = result + temp;
             }
-            
+
             // Multiply temp by X (shift left by 1)
             let overflow = temp.get_bit(M - 1);
             temp = temp.shift_left(1);
-            
+
             if overflow {
                 // Reduce by subtracting (XOR) irreducible polynomial
                 for j in 0..=M {
-                    if self.get_irreducible_bit(j) {
+                    if self.get_bit_from_modulo(j) {
                         let current = temp.get_bit(j);
                         temp.set_bit(j, current ^ true);
                     }
                 }
             }
-            
+
             temp.reduce();
         }
-        
+
         result.reduce();
         result
     }
