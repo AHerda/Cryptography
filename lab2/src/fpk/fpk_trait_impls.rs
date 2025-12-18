@@ -30,7 +30,7 @@ impl<const P: T, const K: T> Fpk<P, K> {
             .all(|(a, b)| a == b)
     }
 
-    fn degree(&self) -> Option<usize> {
+    fn _degree(&self) -> Option<usize> {
         self.poly.degree()
     }
 

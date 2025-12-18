@@ -1,4 +1,4 @@
-use super::{Field, Pow, Sqrt};
+use super::{Field, Pow};
 
 // This is needed for tests in Fpk and Fp
 impl Pow for usize {

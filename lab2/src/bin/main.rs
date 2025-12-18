@@ -1,31 +1,40 @@
 extern crate lab2;
 
 use lab2::{
-    f2m::{F2m, bit::Bits8},
-    polynomials::Polynomial,
+    f2m::{F2m, bit::Bits8}, fp::{self, Fp}, polynomials::Polynomial,
+    fpk::{Fpk, self},
 };
 
 const P: usize = 19;
 
-fn main() {
-    const M: usize = 12;
-    let pk = Polynomial::new(vec![Bits8(0b11110111), Bits8(0b00010000)]);
-    for i in 0..M {
-        println!("i = {}", i);
-        let mut number1: u8 = 1;
-        let mut number2: u8 = if i < 8 { 0 } else { 1 };
-        for j in 0..i {
-            println!("\tj = {}", j);
-            if j < 8 {
-                number1 <<= 1;
-                number1 += 1;
-            } else if j < 16 {
-                number2 <<= 1;
-                number2 += 1;
-            }
-        }
-        let coeff = Polynomial::new(vec![Bits8(number1), Bits8(number2)]);
-        let f2m: F2m<M> = F2m::new(coeff, pk.clone());
-        assert_eq!(f2m.degree(), Some(i));
-    }
+fn main() -> std::io::Result<()> {
+    let fp_elem1: Fpk<P, 5> = Fpk::new(Polynomial::new(vec![
+        Fp::new(3),
+        Fp::new(4),
+        Fp::new(10),
+        Fp::new(1),
+        Fp::new(0),
+        Fp::new(2),
+    ]), Polynomial::new(vec![
+        Fp::new(1),
+        Fp::new(2),
+        Fp::new(3),
+        Fp::new(1),
+        Fp::new(2),
+        Fp::new(3),
+    ]));
+    let serialized = serde_json::to_string(&fp_elem1)?;
+    println!("Fp element 1: {}", serialized);
+    const P: usize = fpk::deser(include_str!("data.json"), "P");
+    const K: usize = fpk::deser(include_str!("data.json"), "K");
+    let fp_elem2: Fpk<P, K> = serde_json::from_str(&serialized)?;
+    let serialized2 = serde_json::to_string(&fp_elem2)?;
+    println!("Fp element 2: {}", serialized2);
+
+    println!("{}", fp_elem1);
+    println!("{}", fp_elem2);
+
+
+
+    Ok(())
 }

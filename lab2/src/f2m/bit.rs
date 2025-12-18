@@ -1,33 +1,14 @@
 use std::fmt::Display;
-use std::ops::{Add, BitAnd, BitOr, BitXor, Div, Mul, Neg, Not, Sub};
+use std::ops::{Add, BitAnd, BitOr, BitXor, Mul, Neg, Not, Sub};
 
-use crate::traits::{Field, Pow};
+use crate::traits::Pow;
 
 #[derive(Debug, Copy, Clone, PartialEq, Eq)]
 pub struct Bits8(pub u8);
 
-impl Field for Bits8 {}
-
 impl Display for Bits8 {
     fn fmt(&self, fmt: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(fmt, "{:b}", self.0)
-    }
-}
-
-impl Pow for Bits8 {
-    fn one(&self) -> Self {
-        Self(1)
-    }
-
-    fn zero(&self) -> Self {
-        Self(0)
-    }
-
-    fn pow(self, exponent: usize) -> Self {
-        if self == self.zero() && exponent == 0 {
-            panic!("Zero raised to the power of zero is undefined");
-        }
-        self
     }
 }
 
@@ -88,18 +69,18 @@ impl Sub for Bits8 {
 }
 
 impl Mul for Bits8 {
-    type Output = Bits8;
+    type Output = Self;
 
-    fn mul(self, other: Self) -> Self::Output {
-        self & other
+    fn mul(self, _other: Self) -> Self::Output {
+        self
     }
 }
 
-impl Div for Bits8 {
-    type Output = Bits8;
-
-    fn div(self, other: Self) -> Self {
-        assert_ne!(other, other.zero(), "Division of bits by Zero");
-        self
+impl Pow for Bits8 {
+    fn zero(&self) -> Self {
+        Bits8(0)
+    }
+    fn one(&self) -> Self {
+        Bits8(1)
     }
 }

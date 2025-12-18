@@ -4,3 +4,16 @@ pub mod fp;
 pub mod fpk;
 pub mod polynomials;
 pub mod traits;
+
+pub type T = usize;
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum FieldFormat {
+    Decimal,
+    Hex,
+    Base64,
+}
+
+thread_local! {
+    pub static SERIALIZATION_FORMAT: std::cell::Cell<FieldFormat> = std::cell::Cell::new(FieldFormat::Decimal);
+}

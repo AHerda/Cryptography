@@ -1,5 +1,5 @@
 use std::fmt::Display;
-use std::ops::{Add, Div, Mul, Neg, Rem, Sub};
+use std::ops::{Add, Div, Mul, Neg, Rem, Sub, Shl};
 
 use super::{Bits8, F2m, T};
 use crate::polynomials::Polynomial;
@@ -12,16 +12,10 @@ impl<const M: T> F2m<M> {
             mod_deg,
             M
         );
-        let pol_deg_option = Self::poly_degree(&poly);
-
-        if let Some(pol_deg) = pol_deg_option && pol_deg < mod_deg {
-            Self { poly, modulo }
-        } else {
-            Self {
-                poly: poly % modulo.clone(),
-                modulo,
-            }
-        }
+        
+        let mut result = Self { poly, modulo };
+        result.reduce();
+        result
     }
 
     #[inline]
@@ -59,19 +53,11 @@ impl<const M: T> F2m<M> {
 
     // }
 
-    fn get_bit(&self, index: usize) -> bool {
-        let coef = self.coefficients();
-        let byte_index = index / 8;
-        let bit_index = index % 8;
-
-        if byte_index >= coef.len() {
-            false
-        } else {
-            (coef[byte_index].0 & (1 << bit_index)) != 0
-        }
+    fn _get_bit(&self, index: usize) -> bool {
+        self.poly.get_bit(index)
     }
 
-    fn get_bit_from_modulo(&self, index: usize) -> bool {
+    fn _get_bit_from_modulo(&self, index: usize) -> bool {
         let coef = self.modulo.coefficients();
         let byte_index = index / 8;
         let bit_index = index % 8;
@@ -83,26 +69,12 @@ impl<const M: T> F2m<M> {
         }
     }
 
-    fn shift_left(self, shift: usize) -> Self {
-        if shift == 0 {
-            return self;
-        }
+    fn reduce(&mut self) {
+        self.poly = Self::div_rem_poly(&self.poly, &self.modulo).1;
+    }
 
-        let mut coef = self.coefficients();
-        let n = coef.len();
-        for _ in 0..((shift - 1) / 8) {
-            coef.push(Bits8(0));
-        }
-
-        for i in (0..n).rev() {
-            let byte_shitf = shift / 8;
-            let bit_shift = shift % 8;
-
-            coef[i + byte_shitf] = Bits8( coef[i].0 << bit_shift );
-            coef[i + byte_shitf + 1] = Bits8( coef[i].0 >> (8 - bit_shift) );
-        }
-
-        Self::new(Polynomial::new(coef), self.modulo.clone())
+    fn div_rem_poly(lhs: &Polynomial<Bits8>, rhs: &Polynomial<Bits8>) -> (Polynomial<Bits8>, Polynomial<Bits8>) {
+        lhs.div_rem(rhs)
     }
 }
 
@@ -147,10 +119,19 @@ impl<const M: T> Display for F2m<M> {
     }
 }
 
+impl<const M: T> Shl<usize> for F2m<M> {
+    type Output = Self;
+
+    fn shl(mut self, shift: usize) -> Self::Output {
+        self.poly = self.poly.clone() << shift;
+        self
+    }
+}
+
 impl<const M: T> Neg for F2m<M> {
     type Output = Self;
 
-    fn neg(self) -> Self {
+    fn neg(self) -> Self::Output {
         self.clone()
     }
 }
@@ -171,7 +152,7 @@ impl<const M: T> Add for F2m<M> {
 impl<const M: T> Sub for F2m<M> {
     type Output = Self;
 
-    fn sub(self, other: Self) -> Self {
+    fn sub(self, other: Self) -> Self::Output {
         assert!(Self::match_mods(&self, &other));
 
         self + other.neg()
@@ -181,36 +162,10 @@ impl<const M: T> Sub for F2m<M> {
 impl<const M: T> Mul for F2m<M> {
     type Output = Self;
 
-    fn mul(self, other: Self) -> Self {
+    fn mul(self, other: Self) -> Self::Output {
         assert!(Self::match_mods(&self, &other));
 
-        let mut result = self.zero();
-        let mut temp = self.clone();
-
-        for i in 0..M {
-            if other.get_bit(i) {
-                result = result + temp;
-            }
-
-            // Multiply temp by X (shift left by 1)
-            let overflow = temp.get_bit(M - 1);
-            temp = temp.shift_left(1);
-
-            if overflow {
-                // Reduce by subtracting (XOR) irreducible polynomial
-                for j in 0..=M {
-                    if self.get_bit_from_modulo(j) {
-                        let current = temp.get_bit(j);
-                        temp.set_bit(j, current ^ true);
-                    }
-                }
-            }
-
-            temp.reduce();
-        }
-
-        result.reduce();
-        result
+        Self::new(self.poly * other.poly, other.modulo)
     }
 }
 

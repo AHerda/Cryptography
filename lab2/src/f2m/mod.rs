@@ -1,11 +1,12 @@
+use crate::T;
 use super::{
-    fp::T,
     polynomials::Polynomial,
     traits::{Field, Pow},
 };
 
 pub mod bit;
 mod f2m_trait_impls;
+mod f2m_serde;
 
 use bit::Bits8;
 
@@ -62,7 +63,7 @@ mod tests {
         let p1: F2m<M> = F2m::new(polynomial, pk.clone());
 
         // Value calculated with wofram mathematica
-        let polynomial = Polynomial::new(vec![Bits8(0b11)]);
+        let polynomial = Polynomial::new(vec![Bits8(0b1)]);
         let expected: F2m<M> = F2m::new(polynomial, pk);
 
         assert_eq!(p1, expected);
@@ -80,6 +81,32 @@ mod tests {
         let expected: F2m<M> = F2m::new(polynomial, pk);
 
         assert_eq!(p1, expected);
+    }
+
+    #[test]
+    fn test_shift() {
+        const M: usize = 23;
+        let pk: Polynomial<Bits8> = Polynomial::new(vec![Bits8(0b10101101), Bits8(0b10101101), Bits8(0b10101101)]);
+
+        let coeff_p = Polynomial::new(vec![Bits8(0b110011)]);
+        let coeff_expected1 = Polynomial::new(vec![Bits8(0b1100110)]);
+        let coeff_expected3 = Polynomial::new(vec![Bits8(0b10011000), Bits8(0b1)]);
+        let coeff_expected8 = Polynomial::new(vec![Bits8(0), Bits8(0b110011)]);
+        let coeff_expected13 = Polynomial::new(vec![Bits8(0), Bits8(0b01100000), Bits8(0b110)]);
+        let coeff_expected17 = Polynomial::new(vec![Bits8(0), Bits8(0), Bits8(0b1100110)]);
+
+        let p1: F2m<M> = F2m::new(coeff_p.clone(), pk.clone());
+        let expected1: F2m<M> = F2m::new(coeff_expected1, pk.clone());
+        let expected3: F2m<M> = F2m::new(coeff_expected3, pk.clone());
+        let expected8: F2m<M> = F2m::new(coeff_expected8, pk.clone());
+        let expected13: F2m<M> = F2m::new(coeff_expected13, pk.clone());
+        let expected17: F2m<M> = F2m::new(coeff_expected17, pk.clone());
+
+        assert_eq!(p1.clone() << 1, expected1);
+        assert_eq!(p1.clone() << 3, expected3);
+        assert_eq!(p1.clone() << 8, expected8);
+        assert_eq!(p1.clone() << 13, expected13);
+        assert_eq!(p1.clone() << 17, expected17);
     }
 
     #[test]

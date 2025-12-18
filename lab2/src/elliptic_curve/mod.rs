@@ -1,6 +1,8 @@
 use super::traits::Field;
 
 mod ec_point_impls;
+mod ec_serde;
+mod ec_point_serde;
 
 /// Elliptic curve over a finite field.
 /// Described by the equation y^2 = x^3 + ax + b.

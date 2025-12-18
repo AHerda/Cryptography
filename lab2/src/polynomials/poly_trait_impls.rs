@@ -2,20 +2,13 @@ use std::fmt::Display;
 use std::ops::{Add, Div, Mul, Neg, Rem, Sub};
 
 use super::{Field, Polynomial};
-use crate::traits::{Pow, Sqrt};
+use crate::traits::{Pow};
 
-impl<T: Field> Polynomial<T> {
+impl<T: Clone + Pow + PartialEq> Polynomial<T> {
     pub fn new(coef: Vec<T>) -> Self {
         let mut result = Self { coef };
         result.normalize();
         result
-    }
-
-    pub fn degree(&self) -> Option<usize> {
-        match self.coef.len() {
-            0 => None,
-            n => Some(n - 1),
-        }
     }
 
     pub fn is_zero(&self) -> bool {
@@ -26,7 +19,7 @@ impl<T: Field> Polynomial<T> {
         self.coef.clone()
     }
 
-    fn normalize(&mut self) {
+    pub(super) fn normalize(&mut self) {
         while let Some(last) = self.coef.last() {
             if *last == last.zero() {
                 self.coef.pop();
@@ -35,10 +28,15 @@ impl<T: Field> Polynomial<T> {
             }
         }
     }
+}
 
-    // pub const fn create_unredeucable_Polynomial<P>() -> Self {
-
-    // }
+impl<T: Field> Polynomial<T> {
+    pub fn degree(&self) -> Option<usize> {
+        match self.coef.len() {
+            0 => None,
+            n => Some(n - 1),
+        }
+    }
 
     fn div_rem(&self, rhs: &Self) -> (Self, Self) {
         let mut remainder = self.clone();
@@ -113,17 +111,17 @@ impl<T: Field> Display for Polynomial<T> {
     }
 }
 
-impl<T: Field> Neg for Polynomial<T> {
+impl<T: Neg<Output = T>> Neg for Polynomial<T> {
     type Output = Self;
 
-    fn neg(self) -> Self {
+    fn neg(self) -> Self::Output {
         Self {
             coef: self.coef.into_iter().map(|coef| -coef).collect::<Vec<T>>(),
         }
     }
 }
 
-impl<T: Field> Add for Polynomial<T> {
+impl<T: Add<Output = T> + Pow + PartialEq> Add for Polynomial<T> {
     type Output = Self;
 
     fn add(self, other: Self) -> Self {
@@ -146,7 +144,7 @@ impl<T: Field> Add for Polynomial<T> {
     }
 }
 
-impl<T: Field> Sub for Polynomial<T> {
+impl<T: Add<Output = T> + Neg<Output = T> + Pow + PartialEq> Sub for Polynomial<T> {
     type Output = Self;
 
     fn sub(self, other: Self) -> Self {

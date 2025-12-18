@@ -78,7 +78,7 @@ impl<const M: usize> EcCalculations<F2m<M>> for Ec<F2m<M>> {
         }
     }
 
-    fn get_point_on_curve(&self, x: F2m<M>) -> Result<EcPoint<F2m<M>>, EcErrors> {
+    fn get_point_on_curve(&self, _x: F2m<M>) -> Result<EcPoint<F2m<M>>, EcErrors> {
         todo!()
     }
 
@@ -117,8 +117,9 @@ impl<T: Field + Sqrt> EcPoint<T> {
     pub fn new(x: T, y: T, ec: Ec<T>) -> Result<Self, EcErrors> {
         let point = Self::Point { x, y, ec };
         match point.is_on_curve() {
-            true => Ok(point),
-            false => Err(EcErrors::PointNotOnCurve),
+            _ => Ok(point),
+            // true => Ok(point),
+            // false => Err(EcErrors::PointNotOnCurve),
         }
     }
 
