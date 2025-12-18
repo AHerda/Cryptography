@@ -1,6 +1,9 @@
-use serde::{Deserialize, Deserializer, Serialize, Serializer, de::{Visitor, MapAccess}};
-use crate::traits::Field;
 use super::EcPoint;
+use crate::traits::Field;
+use serde::{
+    Deserialize, Deserializer, Serialize, Serializer,
+    de::{MapAccess, Visitor},
+};
 
 impl<T: Field + Serialize> Serialize for EcPoint<T> {
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
@@ -62,7 +65,9 @@ impl<'de, T: Field + Deserialize<'de>> Deserialize<'de> for EcPoint<T> {
                         "x" => x = Some(map.next_value()?),
                         "y" => y = Some(map.next_value()?),
                         "ec" => ec = Some(map.next_value()?),
-                        _ => { let _: serde::de::IgnoredAny = map.next_value()?; }
+                        _ => {
+                            let _: serde::de::IgnoredAny = map.next_value()?;
+                        }
                     }
                 }
 

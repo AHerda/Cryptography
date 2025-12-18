@@ -1,12 +1,12 @@
-use crate::polynomials::Polynomial;
-use crate::T;
 use super::fp::Fp;
 use super::traits::Field;
+use crate::T;
+use crate::polynomials::Polynomial;
 
 pub use fpk_serde::deser;
 
-mod fpk_trait_impls;
 mod fpk_serde;
+mod fpk_trait_impls;
 
 #[derive(Debug, PartialEq, Eq, Clone)]
 pub struct Fpk<const P: T, const K: T> {

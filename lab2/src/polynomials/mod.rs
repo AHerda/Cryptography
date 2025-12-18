@@ -1,8 +1,8 @@
 use super::traits::Field;
 
-mod poly_trait_impls;
 mod poly_f2m_trait_impls;
 mod poly_serde;
+mod poly_trait_impls;
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Polynomial<T> {

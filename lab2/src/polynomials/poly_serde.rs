@@ -1,6 +1,10 @@
-use serde::{Deserialize, Deserializer, Serialize, Serializer, ser::SerializeStruct, de::{Visitor, MapAccess}};
-use super::{Polynomial};
+use super::Polynomial;
 use crate::T;
+use serde::{
+    Deserialize, Deserializer, Serialize, Serializer,
+    de::{MapAccess, Visitor},
+    ser::SerializeStruct,
+};
 
 // impl<T> Serialize for Polynomial<T>
 // where
@@ -70,8 +74,10 @@ use crate::T;
 
 impl<T: Serialize> Serialize for Polynomial<T> {
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
-    where S: Serializer {
-        // Polynomial just wraps the vector. 
+    where
+        S: Serializer,
+    {
+        // Polynomial just wraps the vector.
         // When self.coef.serialize is called, it triggers the Fp logic for each element.
         let mut state = serializer.serialize_struct("Polynomial", 1)?;
         state.serialize_field("coeffs", &self.coef)?;
@@ -81,10 +87,14 @@ impl<T: Serialize> Serialize for Polynomial<T> {
 
 impl<'de, T: Deserialize<'de>> Deserialize<'de> for Polynomial<T> {
     fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
-    where D: Deserializer<'de> {
+    where
+        D: Deserializer<'de>,
+    {
         #[derive(Deserialize)]
-        struct RawPoly<T> { coeffs: Vec<T> }
-        
+        struct RawPoly<T> {
+            coeffs: Vec<T>,
+        }
+
         let raw = RawPoly::<T>::deserialize(deserializer)?;
         Ok(Polynomial { coef: raw.coeffs })
     }

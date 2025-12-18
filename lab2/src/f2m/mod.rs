@@ -1,12 +1,12 @@
-use crate::T;
 use super::{
     polynomials::Polynomial,
     traits::{Field, Pow},
 };
+use crate::T;
 
 pub mod bit;
-mod f2m_trait_impls;
 mod f2m_serde;
+mod f2m_trait_impls;
 
 use bit::Bits8;
 
@@ -86,7 +86,11 @@ mod tests {
     #[test]
     fn test_shift() {
         const M: usize = 23;
-        let pk: Polynomial<Bits8> = Polynomial::new(vec![Bits8(0b10101101), Bits8(0b10101101), Bits8(0b10101101)]);
+        let pk: Polynomial<Bits8> = Polynomial::new(vec![
+            Bits8(0b10101101),
+            Bits8(0b10101101),
+            Bits8(0b10101101),
+        ]);
 
         let coeff_p = Polynomial::new(vec![Bits8(0b110011)]);
         let coeff_expected1 = Polynomial::new(vec![Bits8(0b1100110)]);

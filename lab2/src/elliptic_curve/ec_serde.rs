@@ -1,7 +1,11 @@
-use serde::{Deserialize, Deserializer, Serialize, Serializer, ser::SerializeStruct, de::{Visitor, MapAccess}};
+use serde::{
+    Deserialize, Deserializer, Serialize, Serializer,
+    de::{MapAccess, Visitor},
+    ser::SerializeStruct,
+};
 
-use crate::traits::Field;
 use super::Ec;
+use crate::traits::Field;
 
 impl<T: Field + Serialize> Serialize for Ec<T> {
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
@@ -22,7 +26,10 @@ impl<'de, T: Field + Deserialize<'de>> Deserialize<'de> for Ec<T> {
     {
         #[derive(Deserialize)]
         #[serde(field_identifier, rename_all = "lowercase")]
-        enum FieldKey { A, B }
+        enum FieldKey {
+            A,
+            B,
+        }
 
         struct EcVisitor<T>(std::marker::PhantomData<T>);
 
@@ -43,11 +50,15 @@ impl<'de, T: Field + Deserialize<'de>> Deserialize<'de> for Ec<T> {
                 while let Some(key) = map.next_key()? {
                     match key {
                         FieldKey::A => {
-                            if a.is_some() { return Err(serde::de::Error::duplicate_field("a")); }
+                            if a.is_some() {
+                                return Err(serde::de::Error::duplicate_field("a"));
+                            }
                             a = Some(map.next_value()?);
                         }
                         FieldKey::B => {
-                            if b.is_some() { return Err(serde::de::Error::duplicate_field("b")); }
+                            if b.is_some() {
+                                return Err(serde::de::Error::duplicate_field("b"));
+                            }
                             b = Some(map.next_value()?);
                         }
                     }
@@ -55,7 +66,7 @@ impl<'de, T: Field + Deserialize<'de>> Deserialize<'de> for Ec<T> {
 
                 let a = a.ok_or_else(|| serde::de::Error::missing_field("a"))?;
                 let b = b.ok_or_else(|| serde::de::Error::missing_field("b"))?;
-                
+
                 Ok(Ec { a, b })
             }
         }

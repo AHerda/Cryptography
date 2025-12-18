@@ -1,9 +1,9 @@
 use super::traits::{Field, Pow, Sqrt};
-pub use crate::fp::fp_serde::deser;
 use crate::T;
+pub use crate::fp::fp_serde::deser;
 
-mod fp_trait_impls;
 mod fp_serde;
+mod fp_trait_impls;
 
 #[derive(Debug, PartialEq, Eq, PartialOrd, Copy, Clone)]
 pub struct Fp<const P: T>(T);

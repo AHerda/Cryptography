@@ -1,3 +1,5 @@
+use num_bigint::BigUint;
+
 pub mod elliptic_curve;
 pub mod f2m;
 pub mod fp;

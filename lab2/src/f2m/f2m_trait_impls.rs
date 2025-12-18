@@ -1,5 +1,5 @@
 use std::fmt::Display;
-use std::ops::{Add, Div, Mul, Neg, Rem, Sub, Shl};
+use std::ops::{Add, Div, Mul, Neg, Rem, Shl, Sub};
 
 use super::{Bits8, F2m, T};
 use crate::polynomials::Polynomial;
@@ -8,11 +8,8 @@ use crate::traits::Pow;
 impl<const M: T> F2m<M> {
     pub fn new(poly: Polynomial<Bits8>, modulo: Polynomial<Bits8>) -> Self {
         let mod_deg = Self::poly_degree(&modulo).expect("Modulo must have a positive degree");
-        assert_eq!(
-            mod_deg,
-            M
-        );
-        
+        assert_eq!(mod_deg, M);
+
         let mut result = Self { poly, modulo };
         result.reduce();
         result
@@ -73,7 +70,10 @@ impl<const M: T> F2m<M> {
         self.poly = Self::div_rem_poly(&self.poly, &self.modulo).1;
     }
 
-    fn div_rem_poly(lhs: &Polynomial<Bits8>, rhs: &Polynomial<Bits8>) -> (Polynomial<Bits8>, Polynomial<Bits8>) {
+    fn div_rem_poly(
+        lhs: &Polynomial<Bits8>,
+        rhs: &Polynomial<Bits8>,
+    ) -> (Polynomial<Bits8>, Polynomial<Bits8>) {
         lhs.div_rem(rhs)
     }
 }

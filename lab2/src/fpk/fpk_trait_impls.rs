@@ -4,7 +4,7 @@ use std::ops::{Add, Div, Mul, Neg, Rem, Sub};
 use super::{Fpk, T};
 use crate::fp::Fp;
 use crate::polynomials::Polynomial;
-use crate::traits::Pow;
+use crate::traits::{Pow, Sqrt};
 
 impl<const P: T, const K: T> Fpk<P, K> {
     pub fn new(poly: Polynomial<Fp<P>>, modulo: Polynomial<Fp<P>>) -> Self {
@@ -41,10 +41,10 @@ impl<const P: T, const K: T> Fpk<P, K> {
 
 impl<const P: T, const K: T> Pow for Fpk<P, K> {
     fn zero(&self) -> Self {
-        Self::new(self.poly.zero(), self.modulo.clone())
+        Self::new(self.modulo.zero(), self.modulo.clone())
     }
     fn one(&self) -> Self {
-        Self::new(self.poly.one(), self.modulo.clone())
+        Self::new(self.modulo.one(), self.modulo.clone())
     }
 }
 
@@ -126,5 +126,11 @@ impl<const P: T, const K: T> Rem for Fpk<P, K> {
             poly: self.poly % other.poly,
             modulo: self.modulo,
         }
+    }
+}
+
+impl<const P: T, const K: T> Sqrt for Fpk<P, K> {
+    fn sqrt(self) -> Option<Self> {
+        Some(self)
     }
 }

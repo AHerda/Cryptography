@@ -6,7 +6,7 @@ use crate::{
     traits::{EcCalculations, Pow, Sqrt},
 };
 
-impl<T: Field + Sqrt> Ec<T> {
+impl<T: Field> Ec<T> {
     pub fn new(a: T, b: T) -> Self {
         Self { a, b }
     }
@@ -18,15 +18,20 @@ impl<T: Field + Sqrt> Ec<T> {
 
 impl<T: Field + Sqrt> EcCalculations<T> for Ec<T> {
     fn get_point_on_curve(&self, x: T) -> Result<EcPoint<T>, EcErrors> {
-        let y = (x.clone().pow(3) + self.a.clone() * x.clone() + self.b.clone()).sqrt();
-        match y {
-            Some(val) => Ok(EcPoint::Point {
-                x,
-                y: val,
-                ec: self.clone(),
-            }),
-            Option::None => Err(EcErrors::NoYValueForSpecifiedX),
-        }
+        let y = (x.clone().pow(3) + self.a.clone() * x.clone() + self.b.clone());//.sqrt();
+        // match y {
+        //     Some(val) => Ok(EcPoint::Point {
+        //         x,
+        //         y: val,
+        //         ec: self.clone(),
+        //     }),
+        //     Option::None => Err(EcErrors::NoYValueForSpecifiedX),
+        // }
+        Ok(EcPoint::Point {
+            x,
+            y,//: val,
+            ec: self.clone(),
+        })
     }
 
     #[inline]
@@ -58,7 +63,7 @@ impl<T: Field + Sqrt> EcCalculations<T> for Ec<T> {
         let x_sq = x.clone().pow(2);
         let scale = (x_sq.clone() + x_sq.clone() + x_sq + self.a.clone()) / (y.clone() + y.clone());
         let x_new = scale.clone() * scale.clone() - x.clone() - x.clone();
-        let y_new = scale * (x.clone() - x.clone()) - y.clone();
+        let y_new = scale * (x.clone() - x_new.clone()) - y.clone();
         EcPoint::Point {
             x: x_new,
             y: y_new,

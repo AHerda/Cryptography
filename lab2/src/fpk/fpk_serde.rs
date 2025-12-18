@@ -1,5 +1,9 @@
-use serde::{Deserialize, Deserializer, Serialize, Serializer, ser::SerializeStruct, de::{Visitor, MapAccess}};
 use super::{Fpk, T};
+use serde::{
+    Deserialize, Deserializer, Serialize, Serializer,
+    de::{MapAccess, Visitor},
+    ser::SerializeStruct,
+};
 
 pub const fn deser(s: &str, key_name: &str) -> T {
     let bytes = s.as_bytes();
@@ -29,14 +33,20 @@ pub const fn deser(s: &str, key_name: &str) -> T {
         i += 1;
     }
 
-    if !found { return 0; }
+    if !found {
+        return 0;
+    }
 
     // Skip whitespace
-    while i < bytes.len() && (bytes[i] == b' ' || bytes[i] == b':') { i += 1; }
+    while i < bytes.len() && (bytes[i] == b' ' || bytes[i] == b':') {
+        i += 1;
+    }
 
     while i < bytes.len() {
         let b = bytes[i];
-        if b < b'0' || b > b'9' { break; }
+        if b < b'0' || b > b'9' {
+            break;
+        }
         num = num * 10 + (b - b'0') as T;
         i += 1;
     }
@@ -65,7 +75,12 @@ impl<'de, const P: T, const K: T> Deserialize<'de> for Fpk<P, K> {
     {
         #[derive(Deserialize)]
         #[serde(field_identifier)]
-        enum Field { P, K, Poly, Modulo }
+        enum Field {
+            P,
+            K,
+            Poly,
+            Modulo,
+        }
 
         struct FpkVisitor<const P: T, const K: T>;
 
@@ -88,21 +103,31 @@ impl<'de, const P: T, const K: T> Deserialize<'de> for Fpk<P, K> {
                         Field::P => {
                             let val: T = map.next_value()?;
                             if val != P {
-                                return Err(serde::de::Error::custom(format!("P mismatch: expected {}, got {}", P, val)));
+                                return Err(serde::de::Error::custom(format!(
+                                    "P mismatch: expected {}, got {}",
+                                    P, val
+                                )));
                             }
                         }
                         Field::K => {
                             let val: T = map.next_value()?;
                             if val != K {
-                                return Err(serde::de::Error::custom(format!("K mismatch: expected {}, got {}", K, val)));
+                                return Err(serde::de::Error::custom(format!(
+                                    "K mismatch: expected {}, got {}",
+                                    K, val
+                                )));
                             }
                         }
                         Field::Poly => {
-                            if poly.is_some() { return Err(serde::de::Error::duplicate_field("poly")); }
+                            if poly.is_some() {
+                                return Err(serde::de::Error::duplicate_field("poly"));
+                            }
                             poly = Some(map.next_value()?);
                         }
                         Field::Modulo => {
-                            if modulo.is_some() { return Err(serde::de::Error::duplicate_field("modulo")); }
+                            if modulo.is_some() {
+                                return Err(serde::de::Error::duplicate_field("modulo"));
+                            }
                             modulo = Some(map.next_value()?);
                         }
                     }
@@ -110,7 +135,7 @@ impl<'de, const P: T, const K: T> Deserialize<'de> for Fpk<P, K> {
 
                 let poly = poly.ok_or_else(|| serde::de::Error::missing_field("poly"))?;
                 let modulo = modulo.ok_or_else(|| serde::de::Error::missing_field("modulo"))?;
-                
+
                 Ok(Fpk { poly, modulo })
             }
         }

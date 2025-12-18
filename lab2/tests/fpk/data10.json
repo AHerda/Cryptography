@@ -1,0 +1,23 @@
+{
+  "P": 19,
+  "K": 5,
+  "poly": {
+    "coeffs": [
+      { "number": 15, "modulo": 19 },
+      { "number": 9, "modulo": 19 },
+      { "number": 8, "modulo": 19 },
+      { "number": 13, "modulo": 19 },
+      { "number": 5, "modulo": 19 }
+    ]
+  },
+  "modulo": {
+    "coeffs": [
+      { "number": 1, "modulo": 19 },
+      { "number": 2, "modulo": 19 },
+      { "number": 3, "modulo": 19 },
+      { "number": 1, "modulo": 19 },
+      { "number": 2, "modulo": 19 },
+      { "number": 3, "modulo": 19 }
+    ]
+  }
+}

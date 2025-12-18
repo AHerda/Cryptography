@@ -2,7 +2,7 @@ use std::fmt::Display;
 use std::ops::{Add, Div, Mul, Neg, Rem, Sub};
 
 use super::{Field, Polynomial};
-use crate::traits::{Pow};
+use crate::traits::Pow;
 
 impl<T: Clone + Pow + PartialEq> Polynomial<T> {
     pub fn new(coef: Vec<T>) -> Self {

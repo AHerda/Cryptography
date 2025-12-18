@@ -1,14 +1,16 @@
+use crate::polynomials::Polynomial;
 use serde::de::{MapAccess, Visitor};
 use serde::{Deserialize, Deserializer, Serialize, Serializer, ser::SerializeStruct};
-use crate::polynomials::Polynomial;
 
-use crate::{T, SERIALIZATION_FORMAT, FieldFormat};
+use crate::{FieldFormat, SERIALIZATION_FORMAT, T};
 
-use super::{F2m, Bits8};
+use super::{Bits8, F2m};
 
 impl<const M: T> Serialize for F2m<M> {
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
-    where S: Serializer {
+    where
+        S: Serializer,
+    {
         let mut state = serializer.serialize_struct("F2m", 3)?;
         state.serialize_field("M", &M)?;
         state.serialize_field("poly", &PackedPoly(&self.poly))?;
@@ -22,12 +24,14 @@ struct PackedPoly<'a>(&'a Polynomial<Bits8>);
 
 impl<'a> Serialize for PackedPoly<'a> {
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
-    where S: Serializer {
+    where
+        S: Serializer,
+    {
         let format = SERIALIZATION_FORMAT.with(|f| f.get());
-        
+
         // 1. Concatenate Vec<Bits8> into a large byte array
         let bytes: Vec<u8> = self.0.coef.iter().map(|b| b.0).collect();
-        
+
         // 2. Format based on selected base
         match format {
             FieldFormat::Decimal => {
@@ -38,14 +42,15 @@ impl<'a> Serialize for PackedPoly<'a> {
                     num |= (b as u128) << (i * 8);
                 }
                 serializer.serialize_str(&num.to_string())
-            },
+            }
             FieldFormat::Hex => {
                 let mut hex_s = String::from("0x");
-                for &b in bytes.iter().rev() { // rev() for big-endian hex representation
+                for &b in bytes.iter().rev() {
+                    // rev() for big-endian hex representation
                     hex_s.push_str(&format!("{:02x}", b));
                 }
                 serializer.serialize_str(&hex_s)
-            },
+            }
             FieldFormat::Base64 => {
                 use base64::{Engine as _, engine::general_purpose};
                 let s = general_purpose::STANDARD.encode(&bytes);
@@ -57,31 +62,42 @@ impl<'a> Serialize for PackedPoly<'a> {
 
 impl<'de, const M: T> Deserialize<'de> for F2m<M> {
     fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
-    where D: Deserializer<'de> {
+    where
+        D: Deserializer<'de>,
+    {
         #[derive(Deserialize)]
         #[serde(rename_all = "lowercase")]
-        enum Field { M, Poly, Modulo }
+        enum Field {
+            M,
+            Poly,
+            Modulo,
+        }
 
         struct F2mVisitor<const M: T>;
         impl<const M: T> F2mVisitor<M> {
             fn parse_packed<'de, V>(&self, map: &mut V) -> Result<Polynomial<Bits8>, V::Error>
-            where V: MapAccess<'de> {
+            where
+                V: MapAccess<'de>,
+            {
                 let s: String = map.next_value()?;
                 let bytes = if s.starts_with("0x") {
                     // Hex parsing (Big Endian logic)
                     let raw = hex::decode(&s[2..]).map_err(serde::de::Error::custom)?;
                     raw.into_iter().rev().collect()
-                } else if s.len() > 10 { // Base64 heuristic
+                } else if s.len() > 10 {
+                    // Base64 heuristic
                     use base64::{Engine as _, engine::general_purpose};
-                    general_purpose::STANDARD.decode(s).map_err(serde::de::Error::custom)?
+                    general_purpose::STANDARD
+                        .decode(s)
+                        .map_err(serde::de::Error::custom)?
                 } else {
                     // Decimal parsing (requires BigInt if > 128 bits)
                     let num = s.parse::<u128>().map_err(serde::de::Error::custom)?;
                     num.to_le_bytes().to_vec()
                 };
 
-                Ok(Polynomial { 
-                    coef: bytes.into_iter().map(Bits8).collect() 
+                Ok(Polynomial {
+                    coef: bytes.into_iter().map(Bits8).collect(),
                 })
             }
         }
@@ -92,7 +108,9 @@ impl<'de, const M: T> Deserialize<'de> for F2m<M> {
             }
 
             fn visit_map<V>(self, mut map: V) -> Result<F2m<M>, V::Error>
-            where V: MapAccess<'de> {
+            where
+                V: MapAccess<'de>,
+            {
                 let mut poly = None;
                 let mut modulo = None;
 
@@ -100,16 +118,18 @@ impl<'de, const M: T> Deserialize<'de> for F2m<M> {
                     match key {
                         Field::M => {
                             let val: T = map.next_value()?;
-                            if val != M { return Err(serde::de::Error::custom("M mismatch")); }
+                            if val != M {
+                                return Err(serde::de::Error::custom("M mismatch"));
+                            }
                         }
                         Field::Poly => poly = Some(self.parse_packed(&mut map)?),
                         Field::Modulo => modulo = Some(self.parse_packed(&mut map)?),
                     }
                 }
-                
-                Ok(F2m { 
+
+                Ok(F2m {
                     poly: poly.ok_or_else(|| serde::de::Error::missing_field("poly"))?,
-                    modulo: modulo.ok_or_else(|| serde::de::Error::missing_field("modulo"))? 
+                    modulo: modulo.ok_or_else(|| serde::de::Error::missing_field("modulo"))?,
                 })
             }
         }
