@@ -118,12 +118,10 @@ impl Shl<usize> for Polynomial<Bits8> {
         for i in (0..n).rev() {
             let temp = self.coef[i].0;
             self.coef[i] = Bits8(0);
-            self.coef[i + byte_shift] = Bits8(temp << bit_shift);
-            self.coef[i + byte_shift + 1] = Bits8(if bit_shift > 0 {
-                temp >> (8 - bit_shift)
-            } else {
-                0
-            });
+            self.coef[i + byte_shift].0 = temp << bit_shift;
+            if bit_shift > 0 {
+                self.coef[i + byte_shift + 1].0 |= temp >> (8 - bit_shift);
+            }
         }
 
         self.normalize();
@@ -135,7 +133,7 @@ impl Mul for Polynomial<Bits8> {
     type Output = Self;
 
     fn mul(self, other: Self) -> Self::Output {
-        if other.is_zero() {
+        if other.is_zero() || self.is_zero() {
             return self.zero();
         }
         let degree = other.degree().unwrap();

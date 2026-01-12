@@ -15,6 +15,24 @@ impl<const M: T> F2m<M> {
         result
     }
 
+    pub fn new_from_slice(poly: &[Bits8], modulo: &[Bits8]) -> Self {
+        let poly = Polynomial::new(poly.to_owned());
+        let modulo = Polynomial::new(modulo.to_owned());
+
+        Self::new(poly, modulo)
+    }
+
+    pub fn get_modulo(&self) -> Polynomial<Bits8> {
+        self.modulo.clone()
+    }
+
+    pub fn get_modulo_unreduced(&self) -> Self {
+        Self {
+            poly: self.modulo.clone(),
+            modulo: self.modulo.clone(),
+        }
+    }
+
     #[inline]
     fn match_mods(lhs: &Self, rhs: &Self) -> bool {
         lhs.modulo
