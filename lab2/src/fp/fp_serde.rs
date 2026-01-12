@@ -13,7 +13,6 @@ pub const fn deser(s: &str, key_name: &str) -> T {
     let mut i = 0;
     let mut found = false;
 
-    // 1. Find the key "NAME":
     while i + key.len() + 3 <= bytes.len() {
         if bytes[i] == b'"' {
             let mut j = 0;
@@ -27,7 +26,6 @@ pub const fn deser(s: &str, key_name: &str) -> T {
             }
             if match_key && bytes[i + 1 + key.len()] == b'"' {
                 i += key.len() + 2;
-                // Look for the colon
                 while i < bytes.len() && (bytes[i] == b' ' || bytes[i] == b':') {
                     i += 1;
                 }
@@ -42,14 +40,12 @@ pub const fn deser(s: &str, key_name: &str) -> T {
         return 0;
     }
 
-    // 2. Handle potential opening quote for the value
     let mut in_quotes = false;
     if bytes[i] == b'"' {
         in_quotes = true;
         i += 1;
     }
 
-    // 3. Detect Hex prefix
     let mut num: T = 0;
     if i + 2 < bytes.len() && bytes[i] == b'0' && (bytes[i + 1] == b'x' || bytes[i + 1] == b'X') {
         i += 2;
@@ -65,7 +61,6 @@ pub const fn deser(s: &str, key_name: &str) -> T {
             i += 1;
         }
     } else {
-        // 4. Handle Decimal
         while i < bytes.len() {
             let b = bytes[i];
             if b < b'0' || b > b'9' {
@@ -144,13 +139,11 @@ impl<'de, const P: T> Deserialize<'de> for Fp<P> {
                                     if s.starts_with("0x") {
                                         T::from_str_radix(&s[2..], 16)
                                             .map_err(serde::de::Error::custom)?
-                                    } else if s.len() > 10 {
-                                        // Simple heuristic for B64
+                                    } else if s.ends_with('=') {
                                         use base64::{Engine as _, engine::general_purpose};
                                         let bytes = general_purpose::STANDARD
                                             .decode(s)
                                             .map_err(serde::de::Error::custom)?;
-                                        // Convert bytes back to usize (assuming T is usize/u64)
                                         let mut arr = [0u8; 8];
                                         arr.copy_from_slice(&bytes[bytes.len() - 8..]);
                                         usize::from_be_bytes(arr)
@@ -163,18 +156,33 @@ impl<'de, const P: T> Deserialize<'de> for Fp<P> {
                             });
                         }
                         Field::Modulo => {
-                            if modulo.is_some() {
-                                return Err(serde::de::Error::duplicate_field("modulo"));
-                            }
-                            let m: T = map.next_value()?;
-                            // Validation: Ensure the JSON modulo matches the Type modulo
-                            if m != P {
+                            let val = map.next_value::<Value>()?;
+                            modulo = Some(match val {
+                                Value::String(s) => {
+                                    if s.starts_with("0x") {
+                                        T::from_str_radix(&s[2..], 16)
+                                            .map_err(serde::de::Error::custom)?
+                                    } else if s.ends_with('=') {
+                                        use base64::{Engine as _, engine::general_purpose};
+                                        let bytes = general_purpose::STANDARD
+                                            .decode(s)
+                                            .map_err(serde::de::Error::custom)?;
+                                        let mut arr = [0u8; 8];
+                                        arr.copy_from_slice(&bytes[bytes.len() - 8..]);
+                                        usize::from_be_bytes(arr)
+                                    } else {
+                                        s.parse::<T>().map_err(serde::de::Error::custom)?
+                                    }
+                                }
+                                Value::Number(n) => n.as_u64().unwrap_or(0) as T,
+                                _ => return Err(serde::de::Error::custom("Invalid number format")),
+                            });
+                            if modulo.unwrap() != P {
                                 return Err(serde::de::Error::custom(format!(
                                     "Modulo mismatch: expected {}, got {}",
-                                    P, m
+                                    P, modulo.unwrap()
                                 )));
                             }
-                            modulo = Some(m);
                         }
                     }
                 }

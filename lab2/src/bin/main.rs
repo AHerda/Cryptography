@@ -1,7 +1,7 @@
 extern crate lab2;
 
 use lab2::{
-    SERIALIZATION_FORMAT, elliptic_curve::{Ec, EcErrors, EcPoint}, f2m::{F2m, bit::Bits8}, fp::{self, Fp}, fpk::{self, Fpk}, polynomials::Polynomial, traits::Pow
+    FieldFormat, SERIALIZATION_FORMAT, elliptic_curve::{Ec, EcErrors, EcPoint}, f2m::{F2m, bit::Bits8}, fp::{self, Fp}, fpk::{self, Fpk}, polynomials::Polynomial, traits::Pow
 };
 
 
@@ -11,8 +11,16 @@ fn main() -> std::io::Result<()> {
     // let serialized = serde_json::to_string(&fp_elem1)?;
     // println!("Fp element 1: {}", serialized);
 
+    let pk: Polynomial<Bits8> = Polynomial::new(vec![Bits8(0b101101), Bits8(0b101101)]);
+    let poly: Polynomial<Bits8> = Polynomial::new(vec![Bits8(0b1011), Bits8(0b1011)]);
+    let fpk: F2m<13> = F2m::new(poly, pk.clone());
 
-    _ = test_real();
+    SERIALIZATION_FORMAT.with(|f| f.set(FieldFormat::Decimal));
+    let serialized = serde_json::to_string(&fpk)?;
+    println!("{}", serialized);
+
+
+    // _ = test_real();
     Ok(())
 }
 

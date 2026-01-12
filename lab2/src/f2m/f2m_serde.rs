@@ -6,6 +6,72 @@ use crate::{FieldFormat, SERIALIZATION_FORMAT, T};
 
 use super::{Bits8, F2m};
 
+pub const fn deser(s: &str, key_name: &str) -> T {
+    let bytes = s.as_bytes();
+    let key = key_name.as_bytes();
+    let mut i = 0;
+    let mut found = false;
+
+    while i + key.len() + 3 <= bytes.len() {
+        if bytes[i] == b'"' {
+            let mut j = 0;
+            let mut match_key = true;
+            while j < key.len() {
+                if bytes[i + 1 + j] != key[j] {
+                    match_key = false;
+                    break;
+                }
+                j += 1;
+            }
+            if match_key && bytes[i + 1 + key.len()] == b'"' {
+                i += key.len() + 2;
+                while i < bytes.len() && (bytes[i] == b' ' || bytes[i] == b':') {
+                    i += 1;
+                }
+                found = true;
+                break;
+            }
+        }
+        i += 1;
+    }
+
+    if !found || i >= bytes.len() {
+        return 0;
+    }
+
+    let mut in_quotes = false;
+    if bytes[i] == b'"' {
+        in_quotes = true;
+        i += 1;
+    }
+
+    let mut num: T = 0;
+    if i + 2 < bytes.len() && bytes[i] == b'0' && (bytes[i + 1] == b'x' || bytes[i + 1] == b'X') {
+        i += 2;
+        while i < bytes.len() {
+            let b = bytes[i];
+            let val = match b {
+                b'0'..=b'9' => (b - b'0') as T,
+                b'a'..=b'f' => (b - b'a' + 10) as T,
+                b'A'..=b'F' => (b - b'A' + 10) as T,
+                _ => break,
+            };
+            num = num * 16 + val;
+            i += 1;
+        }
+    } else {
+        while i < bytes.len() {
+            let b = bytes[i];
+            if b < b'0' || b > b'9' {
+                break;
+            }
+            num = num * 10 + (b - b'0') as T;
+            i += 1;
+        }
+    }
+    num
+}
+
 impl<const M: T> Serialize for F2m<M> {
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
     where
@@ -13,13 +79,12 @@ impl<const M: T> Serialize for F2m<M> {
     {
         let mut state = serializer.serialize_struct("F2m", 3)?;
         state.serialize_field("M", &M)?;
-        state.serialize_field("poly", &PackedPoly(&self.poly))?;
-        state.serialize_field("modulo", &PackedPoly(&self.modulo))?;
+        state.serialize_field("Poly", &PackedPoly(&self.poly))?;
+        state.serialize_field("Modulo", &PackedPoly(&self.modulo))?;
         state.end()
     }
 }
 
-// Helper struct to handle the bit-packing serialization
 struct PackedPoly<'a>(&'a Polynomial<Bits8>);
 
 impl<'a> Serialize for PackedPoly<'a> {
@@ -29,14 +94,10 @@ impl<'a> Serialize for PackedPoly<'a> {
     {
         let format = SERIALIZATION_FORMAT.with(|f| f.get());
 
-        // 1. Concatenate Vec<Bits8> into a large byte array
         let bytes: Vec<u8> = self.0.coef.iter().map(|b| b.0).collect();
 
-        // 2. Format based on selected base
         match format {
             FieldFormat::Decimal => {
-                // For very large polynomials, Decimal requires BigInt logic.
-                // Assuming small enough for T (usize) here, or use a string.
                 let mut num: u128 = 0; // Use u128 or BigInt for safety
                 for (i, &b) in bytes.iter().enumerate() {
                     num |= (b as u128) << (i * 8);
@@ -46,7 +107,6 @@ impl<'a> Serialize for PackedPoly<'a> {
             FieldFormat::Hex => {
                 let mut hex_s = String::from("0x");
                 for &b in bytes.iter().rev() {
-                    // rev() for big-endian hex representation
                     hex_s.push_str(&format!("{:02x}", b));
                 }
                 serializer.serialize_str(&hex_s)
@@ -66,7 +126,6 @@ impl<'de, const M: T> Deserialize<'de> for F2m<M> {
         D: Deserializer<'de>,
     {
         #[derive(Deserialize)]
-        #[serde(rename_all = "lowercase")]
         enum Field {
             M,
             Poly,
@@ -81,24 +140,19 @@ impl<'de, const M: T> Deserialize<'de> for F2m<M> {
             {
                 let s: String = map.next_value()?;
                 let bytes = if s.starts_with("0x") {
-                    // Hex parsing (Big Endian logic)
                     let raw = hex::decode(&s[2..]).map_err(serde::de::Error::custom)?;
                     raw.into_iter().rev().collect()
-                } else if s.len() > 10 {
-                    // Base64 heuristic
+                } else if s.ends_with('=') {
                     use base64::{Engine as _, engine::general_purpose};
                     general_purpose::STANDARD
                         .decode(s)
-                        .map_err(serde::de::Error::custom)?
+                        .map_err(serde::de::Error::custom)?.to_vec()
                 } else {
-                    // Decimal parsing (requires BigInt if > 128 bits)
                     let num = s.parse::<u128>().map_err(serde::de::Error::custom)?;
                     num.to_le_bytes().to_vec()
                 };
 
-                Ok(Polynomial {
-                    coef: bytes.into_iter().map(Bits8).collect(),
-                })
+                Ok(Polynomial::new(bytes.into_iter().map(Bits8).collect()))
             }
         }
         impl<'de, const M: T> Visitor<'de> for F2mVisitor<M> {
@@ -134,6 +188,6 @@ impl<'de, const M: T> Deserialize<'de> for F2m<M> {
             }
         }
 
-        deserializer.deserialize_struct("F2m", &["m", "poly", "modulo"], F2mVisitor::<M>)
+        deserializer.deserialize_struct("F2m", &["M", "poly", "modulo"], F2mVisitor::<M>)
     }
 }

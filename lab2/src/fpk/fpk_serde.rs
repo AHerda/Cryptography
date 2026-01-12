@@ -12,7 +12,6 @@ pub const fn deser(s: &str, key_name: &str) -> T {
     let mut num: T = 0;
     let mut found = false;
 
-    // Search for "<key_name>":
     while i + key.len() + 3 <= bytes.len() {
         if bytes[i] == b'"' {
             let mut match_key = true;
@@ -37,7 +36,6 @@ pub const fn deser(s: &str, key_name: &str) -> T {
         return 0;
     }
 
-    // Skip whitespace
     while i < bytes.len() && (bytes[i] == b' ' || bytes[i] == b':') {
         i += 1;
     }
@@ -58,12 +56,11 @@ impl<const P: T, const K: T> Serialize for Fpk<P, K> {
     where
         S: Serializer,
     {
-        // Now using 4 fields: P, K, poly, modulo
         let mut state = serializer.serialize_struct("Fpk", 4)?;
         state.serialize_field("P", &P)?;
         state.serialize_field("K", &K)?;
-        state.serialize_field("poly", &self.poly)?;
-        state.serialize_field("modulo", &self.modulo)?;
+        state.serialize_field("Poly", &self.poly)?;
+        state.serialize_field("Modulo", &self.modulo)?;
         state.end()
     }
 }
