@@ -2,7 +2,13 @@ use std::fmt::Display;
 use std::ops::{Add, Div, Mul, Neg, Rem, Sub};
 
 use super::{Field, Polynomial};
-use crate::traits::Pow;
+use crate::{T, traits::Pow};
+
+impl<Y: From<T> + Clone + Pow + PartialEq> Polynomial<Y> {
+    pub fn new_from_slice(coef: &[T]) -> Self {
+        Self::new(coef.into_iter().map(|&x| Y::from(x)).collect())
+    }
+}
 
 impl<T: Clone + Pow + PartialEq> Polynomial<T> {
     pub fn new(coef: Vec<T>) -> Self {

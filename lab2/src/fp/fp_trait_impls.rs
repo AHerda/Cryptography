@@ -4,6 +4,12 @@ use std::ops::{Add, Div, Mul, Neg, Sub};
 use super::{Fp, T};
 use crate::traits::{Pow, Sqrt};
 
+impl<const P: T> From<usize> for Fp<P> {
+    fn from(value: usize) -> Self {
+        Fp::<P>::new(value)
+    }
+}
+
 impl<const P: T> Fp<P> {
     pub const fn new(number: T) -> Self {
         Self(number % P)

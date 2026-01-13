@@ -94,6 +94,10 @@ impl<const M: T> F2m<M> {
     ) -> (Polynomial<Bits8>, Polynomial<Bits8>) {
         lhs.div_rem(rhs)
     }
+
+    pub fn to_vec(&self) -> Vec<u8> {
+        self.coefficients().iter().map(|bits| bits.0).collect()
+    }
 }
 
 impl<const M: T> Pow for F2m<M> {
