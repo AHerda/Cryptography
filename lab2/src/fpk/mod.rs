@@ -1,5 +1,5 @@
 use super::fp::Fp;
-use super::traits::Field;
+use super::traits::{Field, Normal};
 use crate::T;
 use crate::polynomials::Polynomial;
 
@@ -15,6 +15,7 @@ pub struct Fpk<const P: T, const K: T> {
 }
 
 impl<const P: T, const K: T> Field for Fpk<P, K> {}
+impl<const P: T, const K: T> Normal for Fpk<P, K> {}
 
 #[cfg(test)]
 mod tests {

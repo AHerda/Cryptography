@@ -3,7 +3,7 @@ use std::ops::{Add, Mul, Neg, Sub};
 use super::{Ec, EcErrors, EcPoint, Field};
 use crate::{
     f2m::F2m,
-    traits::{EcCalculations, Pow, Sqrt},
+    traits::{EcCalculations, Normal, Pow, Sqrt},
 };
 
 impl<T: Field> Ec<T> {
@@ -16,9 +16,9 @@ impl<T: Field> Ec<T> {
     }
 }
 
-impl<T: Field + Sqrt> EcCalculations<T> for Ec<T> {
+impl<T: Field + Normal> EcCalculations<T> for Ec<T> {
     fn get_point_on_curve(&self, x: T) -> Result<EcPoint<T>, EcErrors> {
-        let y = (x.clone().pow(3) + self.a.clone() * x.clone() + self.b.clone());//.sqrt();
+        let y = (x.clone().pow(3) + self.a.clone() * x.clone() + self.b.clone()); //.sqrt();
         // match y {
         //     Some(val) => Ok(EcPoint::Point {
         //         x,
@@ -29,7 +29,7 @@ impl<T: Field + Sqrt> EcCalculations<T> for Ec<T> {
         // }
         Ok(EcPoint::Point {
             x,
-            y,//: val,
+            y, //: val,
             ec: self.clone(),
         })
     }
@@ -118,7 +118,11 @@ impl<const M: usize> EcCalculations<F2m<M>> for Ec<F2m<M>> {
     }
 }
 
-impl<T: Field + Sqrt> EcPoint<T> {
+impl<T> EcPoint<T>
+where
+    T: Field,
+    Ec<T>: EcCalculations<T>,
+{
     pub fn new(x: T, y: T, ec: Ec<T>) -> Result<Self, EcErrors> {
         let point = Self::Point { x, y, ec };
         match point.is_on_curve() {
@@ -168,7 +172,11 @@ impl<T: Field + Sqrt> EcPoint<T> {
     }
 }
 
-impl<T: Field + Sqrt> Neg for EcPoint<T> {
+impl<T> Neg for EcPoint<T>
+where
+    T: Field + Normal,
+    Ec<T>: EcCalculations<T>,
+{
     type Output = Self;
 
     fn neg(self) -> Self {
@@ -194,7 +202,12 @@ impl<const M: usize> Neg for EcPoint<F2m<M>> {
     }
 }
 
-impl<T: Field + Sqrt> Add for EcPoint<T> {
+impl<T> Add for EcPoint<T>
+where
+    T: Field,
+    Ec<T>: EcCalculations<T>,
+    EcPoint<T>: Neg<Output = Self>,
+{
     type Output = Self;
 
     fn add(self, other: EcPoint<T>) -> Self::Output {
@@ -217,7 +230,11 @@ impl<T: Field + Sqrt> Add for EcPoint<T> {
     }
 }
 
-impl<T: Field + Sqrt> Sub for EcPoint<T> {
+impl<T> Sub for EcPoint<T>
+where
+    T: Field,
+    EcPoint<T>: Neg<Output = Self> + Add<Output = Self>,
+{
     type Output = Self;
 
     fn sub(self, other: Self) -> Self::Output {
@@ -225,7 +242,11 @@ impl<T: Field + Sqrt> Sub for EcPoint<T> {
     }
 }
 
-impl<T: Field + Sqrt> Mul for EcPoint<T> {
+impl<T> Mul for EcPoint<T>
+where
+    T: Field,
+    EcPoint<T>: Add<Output = Self>,
+{
     type Output = Self;
 
     fn mul(self, other: Self) -> Self::Output {
@@ -233,7 +254,11 @@ impl<T: Field + Sqrt> Mul for EcPoint<T> {
     }
 }
 
-impl<T: Field + Sqrt> Pow for EcPoint<T> {
+impl<T> Pow for EcPoint<T>
+where
+    T: Field,
+    EcPoint<T>: Add<Output = Self>,
+{
     fn zero(&self) -> Self {
         Self::Infinity
     }
@@ -242,7 +267,11 @@ impl<T: Field + Sqrt> Pow for EcPoint<T> {
     }
 }
 
-impl<T: Field + Sqrt> Mul<usize> for EcPoint<T> {
+impl<T> Mul<usize> for EcPoint<T>
+where
+    T: Field,
+    EcPoint<T>: Add<Output = Self>,
+{
     type Output = Self;
 
     fn mul(self, other: usize) -> Self::Output {

@@ -5,6 +5,8 @@ use crate::elliptic_curve::{EcErrors, EcPoint};
 
 pub mod needed_impls;
 
+pub trait Normal {}
+
 pub trait Field:
     Clone
     + std::fmt::Debug

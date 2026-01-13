@@ -1,4 +1,4 @@
-use super::traits::{Field, Pow, Sqrt};
+use super::traits::{Field, Normal, Pow, Sqrt};
 use crate::T;
 pub use crate::fp::fp_serde::deser;
 
@@ -9,6 +9,7 @@ mod fp_trait_impls;
 pub struct Fp<const P: T>(T);
 
 impl<const P: T> Field for Fp<P> {}
+impl<const P: T> Normal for Fp<P> {}
 
 #[cfg(test)]
 mod tests {
