@@ -4,13 +4,14 @@ use std::ops::{Add, Div, Mul, Neg, Rem, Sub};
 use super::{Fpk, T};
 use crate::fp::Fp;
 use crate::polynomials::Polynomial;
-use crate::traits::{Pow, Sqrt};
+use crate::traits::needed_impls::gcd;
+use crate::traits::{Inverse, Pow, Sqrt};
 
 impl<const P: T, const K: T> Fpk<P, K> {
     pub fn new(poly: Polynomial<Fp<P>>, modulo: Polynomial<Fp<P>>) -> Self {
         assert_eq!(
             modulo.degree().expect("modulo must have a positive degree"),
-            K
+            K as usize
         );
         Self {
             poly: poly % modulo.clone(),
@@ -132,5 +133,13 @@ impl<const P: T, const K: T> Rem for Fpk<P, K> {
 impl<const P: T, const K: T> Sqrt for Fpk<P, K> {
     fn sqrt(self) -> Option<Self> {
         Some(self)
+    }
+}
+
+impl<const P: T, const K: T> Inverse for Fpk<P, K> {
+    fn inv(self) -> Self {
+        let (g, x, _) = gcd(self.poly, self.modulo.clone());
+        assert_eq!(g, g.one(), "Element is not invertible");
+        Self::new(x, self.modulo)
     }
 }

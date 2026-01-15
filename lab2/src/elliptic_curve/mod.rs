@@ -28,8 +28,8 @@ pub enum EcErrors {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::fp::Fp;
-    const P: usize = 19;
+    use crate::{T, fp::Fp};
+    const P: T = 19;
 
     #[test]
     fn additions_on_infinity() {

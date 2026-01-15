@@ -2,8 +2,9 @@ use std::ops::{Add, Mul, Neg, Sub};
 
 use super::{Ec, EcErrors, EcPoint, Field};
 use crate::{
+    T,
     f2m::F2m,
-    traits::{EcCalculations, Normal, Pow, Sqrt},
+    traits::{EcCalculations, Inverse, Normal, Pow, Sqrt},
 };
 
 impl<T: Field> Ec<T> {
@@ -72,7 +73,7 @@ impl<T: Field + Normal> EcCalculations<T> for Ec<T> {
     }
 }
 
-impl<const M: usize> EcCalculations<F2m<M>> for Ec<F2m<M>> {
+impl<const M: T> EcCalculations<F2m<M>> for Ec<F2m<M>> {
     fn is_point_on_curve(&self, point: &EcPoint<F2m<M>>) -> bool {
         match point {
             EcPoint::Infinity => true,
@@ -187,7 +188,7 @@ where
     }
 }
 
-impl<const M: usize> Neg for EcPoint<F2m<M>> {
+impl<const M: T> Neg for EcPoint<F2m<M>> {
     type Output = Self;
 
     fn neg(self) -> Self::Output {
@@ -275,6 +276,16 @@ where
     type Output = Self;
 
     fn mul(self, other: usize) -> Self::Output {
-        self.pow(other)
+        self.pow(other as u128)
+    }
+}
+
+impl<T> Inverse for EcPoint<T>
+where
+    T: Field,
+    EcPoint<T>: Neg<Output = EcPoint<T>>,
+{
+    fn inv(self) -> Self {
+        self.neg()
     }
 }

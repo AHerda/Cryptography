@@ -1,6 +1,7 @@
 use std::fmt::Display;
-use std::ops::{Add, Div, Mul, Neg, Sub};
+use std::ops::{Add, Div, Mul, Neg, Rem, Sub};
 
+use crate::T;
 use crate::elliptic_curve::{EcErrors, EcPoint};
 
 pub mod needed_impls;
@@ -17,7 +18,7 @@ pub trait Field:
     + Sub<Output = Self>
     + Mul<Output = Self>
     + Div<Output = Self>
-    // + Rem<Output = Self>
+    + Rem<Output = Self>
     + Display
     + Pow
 {
@@ -30,7 +31,7 @@ pub trait Pow: std::ops::Mul<Output = Self> + Clone {
     fn one(&self) -> Self;
     /// Returns the power of the base to the exponent.
     /// Works by using the exponentiation by squaring algorithm.
-    fn pow(self, mut exp: usize) -> Self {
+    fn pow(self, mut exp: T) -> Self {
         let mut base = self.clone();
         let mut result = self.one();
 
@@ -44,6 +45,10 @@ pub trait Pow: std::ops::Mul<Output = Self> + Clone {
 
         result
     }
+}
+
+pub trait Inverse {
+    fn inv(self) -> Self;
 }
 
 pub trait Sqrt: Field {

@@ -7,7 +7,7 @@ pub mod fpk;
 pub mod polynomials;
 pub mod traits;
 
-pub type T = usize;
+pub type T = u128;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum FieldFormat {

@@ -1,29 +1,30 @@
 use std::fmt::Display;
-use std::ops::{Add, Div, Mul, Neg, Sub};
+use std::ops::{Add, Div, Mul, Neg, Rem, Sub};
 
 use super::{Fp, T};
-use crate::traits::{Pow, Sqrt};
+use crate::traits::needed_impls::gcd;
+use crate::traits::{Inverse, Pow, Sqrt};
 
-impl<const P: T> From<usize> for Fp<P> {
-    fn from(value: usize) -> Self {
+impl<const P: T> From<T> for Fp<P> {
+    fn from(value: T) -> Self {
         Fp::<P>::new(value)
     }
 }
 
 impl<const P: T> Fp<P> {
     pub const fn new(number: T) -> Self {
-        Self(number % P)
+        Self((number % P))
     }
 
-    pub fn inverse(&self) -> Self {
-        let zero = self.0.zero();
-        for i in (1..=(self.0 * (P - 1))).step_by(P) {
-            if i % self.0 == zero {
-                return Self(i / self.0);
-            }
-        }
-        panic!("Cannot divide by zero")
-    }
+    // pub fn inverse(&self) -> Self {
+    //     let one = 1;
+    //     for i in (1..=(self.0 * (P - 1))).step_by(P as usize) {
+    //         if i % self.0 == one {
+    //             return Self(i / self.0);
+    //         }
+    //     }
+    //     panic!("Cannot divide by zero")
+    // }
 
     pub fn get(&self) -> T {
         self.0
@@ -93,6 +94,22 @@ impl<const P: T> Div for Fp<P> {
 
     fn div(self, other: Self) -> Self {
         assert_ne!(other, self.zero(), "Division of Polynomial by zero");
-        self * other.inverse()
+        self * dbg!(other.inv())
+    }
+}
+
+impl<const P: T> Rem for Fp<P> {
+    type Output = Self;
+
+    fn rem(self, other: Self) -> Self {
+        Self::new(self.0 % other.0)
+    }
+}
+
+impl<const P: T> Inverse for Fp<P> {
+    fn inv(self) -> Self {
+        let (g, x, _) = dbg!(gcd(self.0 as i128, P as i128));
+        assert_eq!(g, 1, "Element is not invertible");
+        Self::new((x + P as i128) as u128)
     }
 }

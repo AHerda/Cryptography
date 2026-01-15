@@ -1,6 +1,7 @@
 use std::{
     collections::HashSet,
-    ops::{Add, Mul},
+    ops::{Add, Mul, Neg},
+    process::Output,
 };
 
 use lab2::{
@@ -9,163 +10,231 @@ use lab2::{
     f2m::F2m,
     fp::Fp,
     fpk::Fpk,
-    traits::{EcCalculations, Field, Pow},
+    traits::{EcCalculations, Field, Inverse, Pow},
 };
 
+use crate::schnorr::ToJsonSchnorr;
+
+pub trait ParamsForDiffieHellman {
+    type G: Pow + ToJsonSchnorr + Inverse;
+    fn get_g(&self) -> Self::G;
+    fn get_q(&self) -> T;
+}
+
 pub trait DiffieHellman {
-    type G: Mul + PartialEq + Pow;
-    type Params;
-    type SecretKey;
+    type Params: ParamsForDiffieHellman;
+    // type SecretKey;
     type PublicKey;
 
-    fn order_of_group_of_g(g: &Self::G) -> T {
-        let mut temp = g.clone();
-        let mut seen = vec![];
-        while !seen.contains(&temp) && temp != temp.one() {
-            seen.push(temp.clone());
-            temp = temp * g.clone();
-        }
-        seen.len() + 1
-    }
-    fn generate_secret_key(params: &Self::Params, random_value: T) -> Self::SecretKey;
-    fn compute_public_key(params: &Self::Params, secret_key: &Self::SecretKey) -> Self::PublicKey;
+    // fn order_of_group_of_g(g: &Self::G) -> T {
+    //     let mut temp = g.clone();
+    //     let mut seen = vec![];
+    //     while !seen.contains(&temp) && temp != temp.one() {
+    //         seen.push(temp.clone());
+    //         temp = temp * g.clone();
+    //     }
+    //     seen.len() as T + 1
+    // }
+    fn generate_secret_key(params: &Self::Params, random_value: T) -> T;
+    fn compute_public_key(params: &Self::Params, secret_key: &T) -> Self::PublicKey;
     fn compute_shared_secret(
         params: &Self::Params,
-        secret_key: &Self::SecretKey,
+        secret_key: &T,
         public_key: &Self::PublicKey,
     ) -> Self::PublicKey;
 }
 
+pub struct FpParams<const P: T> {
+    pub p: T,
+    pub g: Fp<P>,
+    pub q: T,
+}
+impl<const P: T> ParamsForDiffieHellman for FpParams<P> {
+    type G = Fp<P>;
+    fn get_g(&self) -> Self::G {
+        self.g
+    }
+    fn get_q(&self) -> T {
+        self.q
+    }
+}
 impl<const P: T> DiffieHellman for Fp<P> {
-    type G = Self;
     /// (P, G, Q)
-    type Params = (T, Self::G, T);
-    type SecretKey = T;
+    type Params = FpParams<P>;
+    // type SecretKey = T;
     type PublicKey = Self;
 
-    fn generate_secret_key(params: &Self::Params, random_value: T) -> Self::SecretKey {
-        let (p, g, q) = params;
-        assert_eq!(*p, P);
+    fn generate_secret_key(params: &Self::Params, random_value: T) -> T {
+        assert_eq!(params.p, P);
         // let q = Self::order_of_group_of_g(g);
-        1 + ((random_value - 1) % (q - 1))
+        1 + ((random_value - 1) % (params.q - 1))
     }
 
-    fn compute_public_key(params: &Self::Params, secret_key: &Self::SecretKey) -> Self::PublicKey {
-        let (p, g, _) = params;
-        assert_eq!(*p, P);
-        g.pow(*secret_key)
+    fn compute_public_key(params: &Self::Params, secret_key: &T) -> Self::PublicKey {
+        assert_eq!(params.p, P);
+        params.g.pow(*secret_key)
     }
 
     fn compute_shared_secret(
         params: &Self::Params,
-        secret_key: &Self::SecretKey,
+        secret_key: &T,
         public_key: &Self::PublicKey,
     ) -> Self::PublicKey {
-        let p = params.0;
-        assert_eq!(p, P);
+        assert_eq!(params.p, P);
         public_key.pow(*secret_key)
     }
 }
 
+pub struct FpkParams<const P: T, const K: T> {
+    pub p: T,
+    pub k: T,
+    pub g: Fpk<P, K>,
+    pub q: T,
+}
+impl<const P: T, const K: T> ParamsForDiffieHellman for FpkParams<P, K> {
+    type G = Fpk<P, K>;
+    fn get_g(&self) -> Self::G {
+        self.g.clone()
+    }
+    fn get_q(&self) -> T {
+        self.q
+    }
+}
 impl<const P: T, const K: T> DiffieHellman for Fpk<P, K> {
-    type G = Self;
     /// (P, K, G, Q)
-    type Params = (T, T, Self::G, T);
-    type SecretKey = T;
+    type Params = FpkParams<P, K>;
+    // type SecretKey = T;
     type PublicKey = Self;
 
-    fn generate_secret_key(params: &Self::Params, random_value: T) -> Self::SecretKey {
-        let (p, k, g, q) = params;
-        assert_eq!(*p, P);
-        assert_eq!(*k, K);
+    fn generate_secret_key(params: &Self::Params, random_value: T) -> T {
+        assert_eq!(params.p, P);
+        assert_eq!(params.k, K);
         // let q = Self::order_of_group_of_g(g);
-        1 + ((random_value - 1) % (q - 1))
+        1 + ((random_value - 1) % (params.q - 1))
     }
 
-    fn compute_public_key(params: &Self::Params, secret_key: &Self::SecretKey) -> Self::PublicKey {
-        let (p, k, g, _) = params;
-        assert_eq!(*p, P);
-        assert_eq!(*k, K);
-        g.clone().pow(*secret_key)
+    fn compute_public_key(params: &Self::Params, secret_key: &T) -> Self::PublicKey {
+        assert_eq!(params.p, P);
+        assert_eq!(params.k, K);
+        params.g.clone().pow(*secret_key)
     }
 
     fn compute_shared_secret(
         params: &Self::Params,
-        secret_key: &Self::SecretKey,
+        secret_key: &T,
         public_key: &Self::PublicKey,
     ) -> Self::PublicKey {
-        let (p, k, _, _) = params;
-        assert_eq!(*p, P);
-        assert_eq!(*k, K);
+        assert_eq!(params.p, P);
+        assert_eq!(params.k, K);
         public_key.clone().pow(*secret_key)
+    }
+}
+
+pub struct F2mParams<const M: T> {
+    pub m: T,
+    pub g: F2m<M>,
+    pub q: T,
+}
+impl<const M: T> ParamsForDiffieHellman for F2mParams<M> {
+    type G = F2m<M>;
+    fn get_g(&self) -> Self::G {
+        self.g.clone()
+    }
+    fn get_q(&self) -> T {
+        self.q
     }
 }
 
 impl<const M: T> DiffieHellman for F2m<M> {
-    type G = Self;
     /// (M, G, Q)
-    type Params = (T, Self::G, T);
-    type SecretKey = T;
+    type Params = F2mParams<M>;
+    // type SecretKey = T;
     type PublicKey = Self;
 
-    fn generate_secret_key(params: &Self::Params, random_value: T) -> Self::SecretKey {
-        let (m, g, q) = params;
-        assert_eq!(*m, M);
+    fn generate_secret_key(params: &Self::Params, random_value: T) -> T {
+        assert_eq!(params.m, M);
         // let q = Self::order_of_group_of_g(&g);
-        1 + ((random_value - 1) % (q - 1))
+        1 + ((random_value - 1) % (params.q - 1))
     }
 
-    fn compute_public_key(params: &Self::Params, secret_key: &Self::SecretKey) -> Self::PublicKey {
-        let (m, g, _) = params;
-        assert_eq!(*m, M);
-        g.clone().pow(*secret_key)
+    fn compute_public_key(params: &Self::Params, secret_key: &T) -> Self::PublicKey {
+        assert_eq!(params.m, M);
+        params.g.clone().pow(*secret_key)
     }
 
     fn compute_shared_secret(
         params: &Self::Params,
-        secret_key: &Self::SecretKey,
+        secret_key: &T,
         public_key: &Self::PublicKey,
     ) -> Self::PublicKey {
-        let m = params.0;
-        assert_eq!(m, M);
+        assert_eq!(params.m, M);
         public_key.clone().pow(*secret_key)
     }
 }
 
-impl<Y> DiffieHellman for EcPoint<Y>
+pub struct EcPointParams<Y>
 where
     Y: Field + Pow,
     Ec<Y>: EcCalculations<Y>,
-    EcPoint<Y>: Add<Output = Self>,
+    EcPoint<Y>: Add<Output = EcPoint<Y>>,
 {
-    type G = Self;
+    pub a: Y,
+    pub b: Y,
+    pub g: EcPoint<Y>,
+    pub q: T,
+}
+impl<Y> ParamsForDiffieHellman for EcPointParams<Y>
+where
+    Y: Field + Pow + ToJsonSchnorr,
+    Ec<Y>: EcCalculations<Y>,
+    EcPoint<Y>: Add<Output = EcPoint<Y>> + Neg<Output = EcPoint<Y>> + Inverse,
+{
+    type G = EcPoint<Y>;
+    fn get_g(&self) -> Self::G {
+        self.g.clone()
+    }
+    fn get_q(&self) -> T {
+        self.q
+    }
+}
+impl<Y> DiffieHellman for EcPoint<Y>
+where
+    Y: Field + Pow + ToJsonSchnorr,
+    Ec<Y>: EcCalculations<Y>,
+    EcPoint<Y>: Add<Output = EcPoint<Y>> + Neg<Output = EcPoint<Y>>,
+{
     /// (A, B, (G.x, G.y), Q)
-    type Params = (Y, Y, (Y, Y), T);
-    type SecretKey = T;
+    type Params = EcPointParams<Y>;
+    // type SecretKey = T;
     type PublicKey = Self;
 
-    fn generate_secret_key(params: &Self::Params, random_value: T) -> Self::SecretKey {
-        let (a, b, g, q) = params;
+    fn generate_secret_key(params: &Self::Params, random_value: T) -> T {
+        let EcPointParams { a, b, g, q } = params;
         let _ec: Ec<Y> = Ec::new(a.clone(), b.clone());
-        let _g = Self::new(g.0.clone(), g.1.clone(), _ec).unwrap();
+        let temp = EcPoint::new(a.clone(), b.clone(), _ec).unwrap();
+        assert!(EcPoint::match_ec(g, &temp));
         // let q = Self::order_of_group_of_g(&_g);
 
         1 + ((random_value - 1) % (q - 1))
     }
 
-    fn compute_public_key(params: &Self::Params, secret_key: &Self::SecretKey) -> Self::PublicKey {
-        let (a, b, g, _) = params;
-        let ec: Ec<Y> = Ec::new(a.clone(), b.clone());
-        let g = Self::new(g.0.clone(), g.1.clone(), ec).unwrap();
+    fn compute_public_key(params: &Self::Params, secret_key: &T) -> Self::PublicKey {
+        let EcPointParams { a, b, g, q: _ } = params;
+        let _ec: Ec<Y> = Ec::new(a.clone(), b.clone());
+        let temp = EcPoint::new(a.clone(), b.clone(), _ec).unwrap();
+        assert!(EcPoint::match_ec(g, &temp));
 
         g.clone().pow(*secret_key)
     }
 
     fn compute_shared_secret(
-        _: &Self::Params,
-        secret_key: &Self::SecretKey,
+        params: &Self::Params,
+        secret_key: &T,
         public_key: &Self::PublicKey,
     ) -> Self::PublicKey {
+        let _ec: Ec<Y> = Ec::new(params.a.clone(), params.b.clone());
+        let temp = EcPoint::new(params.a.clone(), params.b.clone(), _ec).unwrap();
+        assert!(EcPoint::match_ec(&params.g, &temp));
         public_key.clone().pow(*secret_key)
     }
 }
@@ -174,7 +243,7 @@ where
 mod tests {
     use super::*;
     use lab2::{
-        elliptic_curve::{Ec, EcPoint},
+        // elliptic_curve::{Ec, EcPoint},
         f2m::{F2m, bit::Bits8},
         fp::Fp,
         fpk::Fpk,
@@ -186,12 +255,12 @@ mod tests {
         alice_rand: T,
         bob_rand: T,
     ) -> (
-        (D::SecretKey, D::PublicKey, D::PublicKey),
-        (D::SecretKey, D::PublicKey, D::PublicKey),
+        (T, D::PublicKey, D::PublicKey),
+        (T, D::PublicKey, D::PublicKey),
     )
     where
         D::PublicKey: std::fmt::Debug + PartialEq,
-        D::SecretKey: std::fmt::Debug,
+        // T: std::fmt::Debug,
     {
         // 1. Alice generates her keys
         let alice_priv = D::generate_secret_key(params, alice_rand);
@@ -232,7 +301,7 @@ mod tests {
         let g = Fp::<P>::new(5);
         let q = 22;
 
-        let params = (P, g, q);
+        let params = FpParams { p: P, g, q };
 
         let (a_res, b_res) = assert_dh_exchange::<Fp<P>>(&params, 6, 15);
 
@@ -246,7 +315,7 @@ mod tests {
     }
 
     #[test]
-    fn test_dh_fpk_extension_field() {
+    fn test_dh_fpk() {
         const P: T = 23;
         const K: T = 11;
         let poly = Polynomial::<Fp<P>>::new_from_slice(&[5, 4, 6, 7, 1]);
@@ -254,13 +323,13 @@ mod tests {
         let g = Fpk::<P, K>::new(poly, modulo);
         let q = 100;
 
-        let params = (P, K, g, q);
+        let params = FpkParams { p: P, k: K, g, q };
 
         _ = assert_dh_exchange::<Fpk<P, K>>(&params, 4, 7);
     }
 
     #[test]
-    fn test_dh_f2m_binary_field() {
+    fn test_dh_f2m() {
         const M: T = 10;
         let g = F2m::<M>::new_from_slice(
             &[Bits8(0b01101000), Bits8(0b10)],
@@ -268,36 +337,25 @@ mod tests {
         );
         let q = 100;
 
-        let params = (M, g, q);
+        let params = F2mParams { m: M, g, q };
 
         _ = assert_dh_exchange::<F2m<M>>(&params, 4, 7);
     }
 
-    // #[test]
-    // fn test_dh_elliptic_curve() {
-    //     // We need a small curve defined over a small Finite Field to test logic
-    //     // without exhausting memory in `order_of_group_of_g`.
+    #[test]
+    fn test_dh_elliptic_curve() {
+        const P: T = 17;
+        type Y = Fp<P>;
 
-    //     // 1. Define Field Y = Fp<17>
-    //     const P: T = 17;
-    //     type Y = Fp<P>;
+        let a = Y::from(2);
+        let b = Y::from(2);
 
-    //     // 2. Define Curve: y^2 = x^3 + 2x + 2 (mod 17)
-    //     // a = 2, b = 2
-    //     let a = Y::from(2);
-    //     let b = Y::from(2);
+        let gx = Y::from(5);
+        let gy = Y::from(1);
+        let g = EcPoint::new(gx, gy, Ec::new(a, b)).unwrap();
 
-    //     // 3. Define Generator Point G = (5, 1)
-    //     // Check: 1^2 = 1. 5^3 + 2*5 + 2 = 125 + 10 + 2 = 137. 137 % 17 = 1. Matches.
-    //     let gx = Y::from(5);
-    //     let gy = Y::from(1);
+        let params = EcPointParams { a, b, g, q: 15 };
 
-    //     // Params structure for EcPoint is (a, b, (gx, gy))
-    //     let params = (a, b, (gx, gy));
-
-    //     // Note: The EcPoint implementation in your code reconstructs the curve
-    //     // inside `generate_secret_key`, so we just pass the raw field elements.
-
-    //     assert_dh_exchange::<EcPoint<Y>>(&params, 3, 7);
-    // }
+        assert_dh_exchange::<EcPoint<Y>>(&params, 3, 7);
+    }
 }

@@ -41,7 +41,7 @@ mod tests {
             }
             let coeff = Polynomial::new(vec![Bits8(number1), Bits8(number2)]);
             let f2m: F2m<M> = F2m::new(coeff, pk.clone());
-            assert_eq!(f2m.degree(), Some(i));
+            assert_eq!(f2m.degree(), Some(i as usize));
         }
     }
 
@@ -57,7 +57,7 @@ mod tests {
 
     #[test]
     fn test_creation() {
-        const M: usize = 3;
+        const M: T = 3;
         let pk: Polynomial<Bits8> = Polynomial::new(vec![Bits8(0b1011)]);
         let polynomial = Polynomial::new(vec![Bits8(0b101101)]);
         let p1: F2m<M> = F2m::new(polynomial, pk.clone());
@@ -71,7 +71,7 @@ mod tests {
 
     #[test]
     fn test_creation2() {
-        const M: usize = 3;
+        const M: T = 3;
         let pk: Polynomial<Bits8> = Polynomial::new(vec![Bits8(0b1101)]);
         let polynomial = Polynomial::new(vec![Bits8(0b0001)]);
         let p1: F2m<M> = F2m::new(polynomial, pk.clone());
@@ -85,7 +85,7 @@ mod tests {
 
     #[test]
     fn test_shift() {
-        const M: usize = 23;
+        const M: T = 23;
         let pk: Polynomial<Bits8> = Polynomial::new(vec![
             Bits8(0b10101101),
             Bits8(0b10101101),
@@ -115,7 +115,7 @@ mod tests {
 
     #[test]
     fn test_add() {
-        const M: usize = 7;
+        const M: T = 7;
         let pk: Polynomial<Bits8> = Polynomial::new(vec![Bits8(0b10101101)]);
 
         let coeff_p1 = Polynomial::new(vec![Bits8(0b100101)]);
@@ -132,7 +132,7 @@ mod tests {
 
     #[test]
     fn test_sub() {
-        const M: usize = 7;
+        const M: T = 7;
         let pk: Polynomial<Bits8> = Polynomial::new(vec![Bits8(0b10101101)]);
 
         let coeff_p1 = Polynomial::new(vec![Bits8(0b100101)]);

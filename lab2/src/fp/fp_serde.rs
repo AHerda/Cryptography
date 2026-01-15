@@ -146,7 +146,7 @@ impl<'de, const P: T> Deserialize<'de> for Fp<P> {
                                             .map_err(serde::de::Error::custom)?;
                                         let mut arr = [0u8; 8];
                                         arr.copy_from_slice(&bytes[bytes.len() - 8..]);
-                                        usize::from_be_bytes(arr)
+                                        usize::from_be_bytes(arr) as T
                                     } else {
                                         s.parse::<T>().map_err(serde::de::Error::custom)?
                                     }
@@ -169,7 +169,7 @@ impl<'de, const P: T> Deserialize<'de> for Fp<P> {
                                             .map_err(serde::de::Error::custom)?;
                                         let mut arr = [0u8; 8];
                                         arr.copy_from_slice(&bytes[bytes.len() - 8..]);
-                                        usize::from_be_bytes(arr)
+                                        usize::from_be_bytes(arr) as T
                                     } else {
                                         s.parse::<T>().map_err(serde::de::Error::custom)?
                                     }
@@ -180,7 +180,8 @@ impl<'de, const P: T> Deserialize<'de> for Fp<P> {
                             if modulo.unwrap() != P {
                                 return Err(serde::de::Error::custom(format!(
                                     "Modulo mismatch: expected {}, got {}",
-                                    P, modulo.unwrap()
+                                    P,
+                                    modulo.unwrap()
                                 )));
                             }
                         }

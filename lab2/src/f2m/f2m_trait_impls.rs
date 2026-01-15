@@ -3,12 +3,13 @@ use std::ops::{Add, Div, Mul, Neg, Rem, Shl, Sub};
 
 use super::{Bits8, F2m, T};
 use crate::polynomials::Polynomial;
-use crate::traits::Pow;
+use crate::traits::needed_impls::gcd;
+use crate::traits::{Inverse, Pow};
 
 impl<const M: T> F2m<M> {
     pub fn new(poly: Polynomial<Bits8>, modulo: Polynomial<Bits8>) -> Self {
         let mod_deg = Self::poly_degree(&modulo).expect("Modulo must have a positive degree");
-        assert_eq!(mod_deg, M);
+        assert_eq!(mod_deg, M as usize);
 
         let mut result = Self { poly, modulo };
         result.reduce();
@@ -216,5 +217,13 @@ impl<const M: T> Rem for F2m<M> {
             poly: self.poly % other.poly,
             modulo: self.modulo,
         }
+    }
+}
+
+impl<const M: T> Inverse for F2m<M> {
+    fn inv(self) -> Self {
+        let (g, x, _) = gcd(self.poly, self.modulo.clone());
+        assert_eq!(g, g.one(), "Element is not invertible");
+        Self::new(x, self.modulo)
     }
 }

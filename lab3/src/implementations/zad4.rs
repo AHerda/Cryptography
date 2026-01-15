@@ -4,9 +4,11 @@ use lab2::{
     f2m::{F2m, bit::Bits8},
     fp::Fp,
     fpk::Fpk,
-    traits::Field,
+    traits::{Field, Inverse, Pow},
 };
 use sha2::{Digest, Sha256};
+
+use crate::diffie_hellman::{DiffieHellman, ParamsForDiffieHellman};
 
 pub trait ToJsonSchnorr {
     fn encode(&self) -> String;
@@ -31,7 +33,7 @@ impl<const P: T, const K: T> ToJsonSchnorr for Fpk<P, K> {
         let mut result = "[".to_string();
         let mut coef: Vec<_> = self.coefficients().iter().map(|fp| fp.encode()).collect();
 
-        while coef.len() < K {
+        while coef.len() < K as usize {
             coef.push(r#""00""#.to_string());
         }
         for c in coef {
@@ -58,7 +60,7 @@ impl<const M: T> ToJsonSchnorr for F2m<M> {
             len = M;
         }
 
-        while bytes.len() < len {
+        while bytes.len() < len as usize {
             bytes.push("00".to_string());
         }
         bytes.push("\"".to_string());
@@ -87,19 +89,63 @@ impl<T: ToJsonSchnorr + Field> ToJsonSchnorr for EcPoint<T> {
         result
     }
 }
-
-pub fn ss(r: impl ToJsonSchnorr, m: &str) -> String {
+pub fn sign<Y: DiffieHellman + ToJsonSchnorr>(
+    params: &Y::Params,
+    random: T,
+    m: &str,
+) -> (T, T, String) {
+    let x = Y::generate_secret_key(params, random);
+    let r = params.get_g().pow(random);
     let mut input = r.encode();
     input.extend(m.chars());
-    Sha256::digest(input)
-        .iter()
-        .map(|b| format!("{:02x}", b))
-        .collect::<String>()
+    let e: Vec<T> = Sha256::digest(input)
+        .chunks_exact(16)
+        .map(|c| T::from_be_bytes(c.try_into().unwrap()))
+        .collect();
+    let mut e2 = e[1];
+    for _ in 0..64 {
+        e2 <<= 1;
+        e2 %= params.get_q();
+    }
+    e2 = (e2 + e[0]) % params.get_q();
+    let s = random + (e2 * (x % params.get_q())) % params.get_q();
+    (
+        s,
+        e2,
+        e.iter().map(|b| format!("{:02x}", b)).collect::<String>(),
+    )
+}
+
+pub fn verify<Y: DiffieHellman + ToJsonSchnorr>(
+    params: &Y::Params,
+    random: T,
+    (s, e): (u128, u128),
+    m: &str,
+) -> bool {
+    let x = Y::generate_secret_key(params, random);
+    let y = params.get_g().pow(x).inv();
+    let r_v = params.get_g().pow(s) * y.pow(e);
+    let mut input = r_v.encode();
+    input.extend(m.chars());
+    let e_v: Vec<T> = Sha256::digest(input)
+        .chunks_exact(16)
+        .map(|c| T::from_be_bytes(c.try_into().unwrap()))
+        .collect();
+    let mut e2 = e_v[1];
+    for _ in 0..64 {
+        e2 <<= 1;
+        e2 %= params.get_q();
+    }
+    e2 = (e2 + e_v[0]) % params.get_q();
+
+    e2 == e
 }
 
 #[cfg(test)]
 mod tests {
     use lab2::polynomials::Polynomial;
+
+    use crate::diffie_hellman::FpParams;
 
     use super::*;
 
@@ -140,9 +186,28 @@ mod tests {
 
     #[test]
     fn test_schnorr_signature() {
+        // 15302^15 = 17 mod 65537 przykład z zadania
         let m = "Alice";
-        let value = ss(Fp::<65537>::new(17), m);
+        let params: FpParams<65537> = FpParams {
+            p: 65537,
+            g: Fp::<65537>::new(15302),
+            q: 65536,
+        };
+        let value = sign::<Fp<65537>>(&params, 15, m).2;
         let expected = "faf463d7d5cf8b6ca0383bcb37b373b71c5ad7e9f0618e0747400fc1ee571830";
         assert_eq!(value, expected);
+    }
+
+    #[test]
+    fn test_sign_and_verify() {
+        let random = 15;
+        let m = "Alice";
+        let params: FpParams<65537> = FpParams {
+            p: 65537,
+            g: Fp::<65537>::new(15302),
+            q: 65536,
+        };
+        let (s, e, _) = sign::<Fp<65537>>(&params, random, m);
+        assert!(verify::<Fp<65537>>(&params, random, (s, e), m));
     }
 }

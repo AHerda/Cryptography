@@ -1,9 +1,14 @@
 extern crate lab2;
 
 use lab2::{
-    FieldFormat, SERIALIZATION_FORMAT, elliptic_curve::{Ec, EcErrors, EcPoint}, f2m::{F2m, bit::Bits8}, fp::{self, Fp}, fpk::{self, Fpk}, polynomials::Polynomial, traits::Pow
+    FieldFormat, SERIALIZATION_FORMAT, T,
+    elliptic_curve::{Ec, EcErrors, EcPoint},
+    f2m::{F2m, bit::Bits8},
+    fp::{self, Fp},
+    fpk::{self, Fpk},
+    polynomials::Polynomial,
+    traits::Pow,
 };
-
 
 fn main() -> std::io::Result<()> {
     // const P: usize = 19;
@@ -19,14 +24,13 @@ fn main() -> std::io::Result<()> {
     let serialized = serde_json::to_string(&fpk)?;
     println!("{}", serialized);
 
-
     // _ = test_real();
     Ok(())
 }
 
 fn test() -> Result<(), EcErrors> {
-    const P: usize = 5;
-    const K: usize = 2;
+    const P: T = 5;
+    const K: T = 2;
     let pk: Polynomial<Fp<P>> = Polynomial::new(vec![Fp::new(2), Fp::new(0), Fp::new(1)]);
     let q_y_poly: Polynomial<Fp<P>> = Polynomial::new(vec![Fp::new(0), Fp::new(1)]);
     let a_b_poly: Polynomial<Fp<P>> = Polynomial::new(vec![Fp::new(1)]);
@@ -44,7 +48,7 @@ fn test() -> Result<(), EcErrors> {
 }
 
 fn test_real() -> Result<(), EcErrors> {
-    const P: usize = 17;
+    const P: T = 17;
     let a_b: Fp<P> = Fp::new(2);
     let ec: Ec<Fp<P>> = Ec::new(a_b.clone(), a_b);
     let p = EcPoint::new(Fp::new(0), Fp::new(6), ec.clone())?;

@@ -1,4 +1,4 @@
-use super::traits::{Field, Normal, Pow, Sqrt};
+use super::traits::{Field, Inverse, Normal, Pow, Sqrt};
 use crate::T;
 pub use crate::fp::fp_serde::deser;
 
@@ -34,7 +34,14 @@ mod tests {
     fn test_inverse() {
         let one: Fp<P> = Fp::new(100);
 
-        assert_eq!(one.inverse(), Fp::new(4));
+        assert_eq!(one.inv(), Fp::new(4));
+    }
+
+    #[test]
+    fn test_inverse2() {
+        let one: Fp<P> = Fp::new(2);
+
+        assert_eq!(one.inv(), Fp::new(10));
     }
 
     #[test]
