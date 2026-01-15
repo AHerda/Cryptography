@@ -24,6 +24,10 @@ impl<const P: T> Fp<P> {
         }
         panic!("Cannot divide by zero")
     }
+
+    pub fn get(&self) -> T {
+        self.0
+    }
 }
 
 impl<const P: T> Pow for Fp<P> {

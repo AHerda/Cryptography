@@ -5,3 +5,4 @@ edition = "2024"
 
 [dependencies]
 lab2 = { version = "0.1.0", path = "../lab2" }
+sha2 = "0.10.9"
